@@ -1,0 +1,321 @@
+openapi: 3.1.0
+info:
+  title: WeatherEvent Mashup API
+  description: Professional mashup combining weather, events and recommendations
+  version: 1.0.0
+  contact:
+    name: Middleware Course
+    email: middleware@univ-cm
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development Server
+
+tags:
+  - name: Agenda
+    description: Mashup endpoints combining weather, events and recommendations
+  - name: Health
+    description: Health check and monitoring
+
+components:
+  schemas:
+    # ===== ENUMS =====
+    ModeEnum:
+      type: string
+      enum:
+        - PARALLEL
+        - SEQUENTIAL
+      default: PARALLEL
+      description: Execution mode for API calls
+
+    StatusEnum:
+      type: string
+      enum:
+        - UP
+        - DOWN
+        - DEGRADED
+      default: UP
+      description: Service health status
+
+    # ===== RESPONSE DTOs =====
+    WeatherResponse:
+      type: object
+      properties:
+        city:
+          type: string
+          example: "Paris"
+        condition:
+          type: string
+          example: "Sunny"
+        temperature:
+          type: number
+          format: double
+          example: 22.5
+        feelsLike:
+          type: number
+          format: double
+          example: 23.0
+        humidity:
+          type: integer
+          example: 65
+        description:
+          type: string
+          example: "Clear sky with light clouds"
+        fallback:
+          type: boolean
+          default: false
+        cachedAt:
+          type: string
+          format: date-time
+          example: "2024-12-25T10:30:00Z"
+
+    EventResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "evt-123"
+        name:
+          type: string
+          example: "Jazz Festival"
+        venue:
+          type: string
+          example: "Downtown Theater"
+        city:
+          type: string
+          example: "Paris"
+        category:
+          type: string
+          example: "Music"
+        imageUrl:
+          type: string
+          format: uri
+          example: "https://example.com/image.jpg"
+        fallback:
+          type: boolean
+          default: false
+
+    RecommendationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "rec-1"
+        activity:
+          type: string
+          example: "Visit Historic Center"
+        venue:
+          type: string
+          example: "Paris Old Town"
+        reason:
+          type: string
+          example: "Beautiful architecture and rich history"
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 1
+        indoor:
+          type: boolean
+          example: false
+
+    ApiStatus:
+      type: object
+      properties:
+        weatherApiAvailable:
+          type: boolean
+          example: true
+        eventsApiAvailable:
+          type: boolean
+          example: true
+        recommendationsApiAvailable:
+          type: boolean
+          example: true
+
+    AgendaResponse:
+      type: object
+      properties:
+        city:
+          type: string
+          example: "Paris"
+        date:
+          type: string
+          example: "2024-12-25"
+        weather:
+          $ref: '#/components/schemas/WeatherResponse'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventResponse'
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendationResponse'
+        processingTimeMs:
+          type: integer
+          format: int64
+          example: 312
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
+        apiStatus:
+          $ref: '#/components/schemas/ApiStatus'
+
+    BenchmarkResult:
+      type: object
+      properties:
+        sequentialTimeMs:
+          type: integer
+          format: int64
+          example: 900
+        parallelTimeMs:
+          type: integer
+          format: int64
+          example: 312
+        speedupFactor:
+          type: number
+          format: double
+          example: 2.88
+        sequentialResponse:
+          $ref: '#/components/schemas/AgendaResponse'
+        parallelResponse:
+          $ref: '#/components/schemas/AgendaResponse'
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        service:
+          type: string
+          example: "WeatherEventMashup"
+        version:
+          type: string
+          example: "1.0.0"
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 404
+        error:
+          type: string
+          example: "City Not Found"
+        message:
+          type: string
+          example: "City 'InvalidCity' not found"
+        path:
+          type: string
+          example: "/api/v1/agenda"
+
+  parameters:
+    CityParam:
+      name: city
+      in: query
+      required: true
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 100
+        pattern: "^[a-zA-Z\\s-]+$"
+      example: "Paris"
+      description: "City name (letters, spaces, hyphens only)"
+
+    DateParam:
+      name: date
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+        pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+      example: "2024-12-25"
+      description: "Date in YYYY-MM-DD format"
+
+paths:
+  /agenda:
+    get:
+      tags: [Agenda]
+      summary: Get complete agenda (weather + events + recommendations)
+      description: Returns a complete agenda using PARALLEL calls to all services
+      operationId: getAgenda
+      parameters:
+        - $ref: '#/components/parameters/CityParam'
+        - $ref: '#/components/parameters/DateParam'
+      responses:
+        '200':
+          description: Agenda successfully built
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgendaResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: City not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agenda/benchmark:
+    get:
+      tags: [Agenda]
+      summary: Compare sequential vs parallel performance
+      description: Returns benchmark results comparing SEQUENTIAL and PARALLEL execution times
+      operationId: benchmarkAgenda
+      parameters:
+        - $ref: '#/components/parameters/CityParam'
+        - $ref: '#/components/parameters/DateParam'
+      responses:
+        '200':
+          description: Benchmark completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchmarkResult'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/circuit-breakers:
+    get:
+      tags: [Health]
+      summary: Get circuit breaker status
+      operationId: getCircuitBreakerStatus
+      responses:
+        '200':
+          description: Circuit breaker status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                  enum: [CLOSED, OPEN, HALF_OPEN]
