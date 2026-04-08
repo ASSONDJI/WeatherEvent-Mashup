@@ -1,6 +1,8 @@
 spring:
   application:
     name: weather-event-mashup
+  profiles:
+    active: local
   cache:
     type: redis
     redis:

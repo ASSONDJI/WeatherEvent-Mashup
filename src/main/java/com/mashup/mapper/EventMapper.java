@@ -21,7 +21,7 @@ public class EventMapper {
         response.setCity(city != null ? city : "Unknown");
         response.setFallback(false);
 
-
+        // Venue
         String venue = "Unknown Venue";
         if (event.getEmbedded() != null &&
                 event.getEmbedded().getVenues() != null &&
@@ -31,7 +31,7 @@ public class EventMapper {
         }
         response.setVenue(venue);
 
-
+        // Category
         String category = "General";
         if (event.getClassifications() != null &&
                 !event.getClassifications().isEmpty() &&

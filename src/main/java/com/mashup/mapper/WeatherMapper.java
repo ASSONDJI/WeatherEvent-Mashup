@@ -16,7 +16,6 @@ public class WeatherMapper {
         WeatherResponse weatherResponse = new WeatherResponse();
         weatherResponse.setCity(response.getName() != null ? response.getName() : "Unknown");
 
-
         if (response.getMain() != null) {
             weatherResponse.setTemperature(response.getMain().getTemp());
             weatherResponse.setFeelsLike(response.getMain().getFeelsLike());
@@ -26,7 +25,6 @@ public class WeatherMapper {
             weatherResponse.setFeelsLike(0.0);
             weatherResponse.setHumidity(0);
         }
-
 
         if (response.getWeather() != null && !response.getWeather().isEmpty()) {
             OpenWeatherResponse.Weather weather = response.getWeather().get(0);
