@@ -1,73 +1,96 @@
-# React + TypeScript + Vite
+# 🌤️ WeatherEvent Mashup - React Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modern React TypeScript client for the WeatherEvent Mashup API.
 
-Currently, two official plugins are available:
+## ✨ Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Real-time Weather Data** - Current weather conditions from OpenWeatherMap API
+- **Local Events** - Cultural events from Ticketmaster API
+- **Smart Recommendations** - Personalized suggestions based on weather conditions (indoor/outdoor)
+- **Performance Benchmark** - Compare sequential vs parallel API calls
+- **Responsive Design** - Glass morphism UI that works on mobile, tablet, and desktop
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Technology | Purpose |
+|------------|---------|
+| React 18 | UI Framework |
+| TypeScript | Type Safety |
+| Vite | Build Tool |
+| Tailwind CSS | Styling |
+| Lucide React | Icons |
+| Axios | HTTP Client |
+| React Hot Toast | Notifications |
 
-## Expanding the ESLint configuration
+##  Quick Start
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 18+
+- Backend running on `http://localhost:8080`
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Project Structure
+```bash
+client/
+├── src/
+│   ├── components/     # React components (WeatherCard, EventsList, RecommendationsList)
+│   ├── services/       # API service layer
+│   ├── types/          # TypeScript interfaces
+│   ├── App.tsx         # Main application
+│   └── index.css       # Tailwind styles
+├── public/             # Static assets (icons, favicon)
+├── index.html          # Entry HTML
+└── package.json        # Dependencies
 ```
+## UI Components
+Component	Description
+WeatherCard	Displays current weather with animated icons
+EventsList	Shows local cultural events by category
+RecommendationsList	Weather-adaptive suggestions with priority ranking
+## API Integration
+The client communicates with the backend API:
+
+* Endpoint	Method	Description
+* /api/v1/agenda?city=X&date=Y	GET	Get complete agenda (parallel mode)
+* /api/v1/agenda/benchmark?city=X&date=Y	GET	Compare sequential vs parallel performance
+* /api/v1/health	GET	Health check
+## 🌐 Environment Variables
+Create a .env file:
+env
+VITE_API_BASE_URL=http://localhost:8080/api/v1
+
+## CORS Configuration
+Make sure the backend allows requests from the client origin:
+
+yaml
+allowed-origins: http://localhost:5173
+## 📦 Available Scripts
+Script	Description
+npm run dev	Start development server
+npm run build	Build for production
+npm run preview	Preview production build
+npm run lint	Run ESLint
+##  Contributing
+* Ensure backend is running
+* Create a feature branch
+* Make changes
+* Test with npm run dev
+* Submit a pull request
+
+## 📄 License
+MIT
+
+##  Author
+**Malaïka Ladéesse Assondji**  
+**Middleware Course - Pr. BOMGNI Alain Bertrand**  
+**Academic Year: 2025/2026**
