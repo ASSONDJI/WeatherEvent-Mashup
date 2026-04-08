@@ -8,69 +8,64 @@ import com.mashup.dto.generated.RecommendationResponse;
 import com.mashup.dto.generated.WeatherResponse;
 import com.mashup.exception.CityNotFoundException;
 import com.mashup.exception.ExternalApiException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Service orchestrant les appels parallèles aux 3 sources de données.
- *
- * Principes démontrés :
- * - Composition de services SOA (mashup)
- * - Appels parallèles avec CompletableFuture.allOf()
- * - Temps total = MAX(latence_météo, latence_events, latence_recos)
- * - Propagation des exceptions métier
- */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AgendaService {
 
     private final WeatherService weatherService;
     private final EventService eventService;
     private final RecommendationService recommendationService;
 
+    @Autowired
+    public AgendaService(WeatherService weatherService,
+                         EventService eventService,
+                         RecommendationService recommendationService) {
+        this.weatherService = weatherService;
+        this.eventService = eventService;
+        this.recommendationService = recommendationService;
+    }
+
     /**
-     * Construit l'agenda en MODE PARALLÈLE.
-     * Les 3 appels sont lancés simultanément.
-     * Temps d'exécution = MAX des 3 latences.
-     *
-     * @param city Ville recherchée
-     * @param date Date des événements
-     * @return AgendaResponse contenant météo + événements + recommandations
-     * @throws CityNotFoundException Si la ville n'existe pas
-     * @throws ExternalApiException Si une API externe est indisponible
+     * Builds agenda in PARALLEL mode.
+     * Recommendations are generated AFTER weather is retrieved
+     * to adapt suggestions to current weather conditions.
      */
     public AgendaResponse buildAgendaParallel(String city, String date) {
         long startTime = System.currentTimeMillis();
-        log.info(" [PARALLEL] Début de l'agenda pour {} le {}", city, date);
+        log.info(" [PARALLEL] Starting agenda for {} on {}", city, date);
 
         try {
 
             CompletableFuture<WeatherResponse> weatherFuture = weatherService.getWeather(city);
             CompletableFuture<List<EventResponse>> eventsFuture = eventService.getEvents(city, date);
+
+
+            WeatherResponse weather = weatherFuture.join();
+
+
             CompletableFuture<List<RecommendationResponse>> recommendationsFuture =
-                    recommendationService.getRecommendations(city);
+                    recommendationService.getRecommendations(city, weather);
 
-
-            CompletableFuture.allOf(weatherFuture, eventsFuture, recommendationsFuture).join();
+            CompletableFuture.allOf(eventsFuture, recommendationsFuture).join();
 
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info(" [PARALLEL] Agenda construit en {}ms pour {}", processingTime, city);
-
+            log.info("[PARALLEL] Agenda built in {}ms for {}", processingTime, city);
 
             AgendaResponse response = new AgendaResponse();
             response.setCity(city);
             response.setDate(date);
-            response.setWeather(weatherFuture.join());
+            response.setWeather(weather);
             response.setEvents(eventsFuture.join());
             response.setRecommendations(recommendationsFuture.join());
             response.setProcessingTimeMs(processingTime);
             response.setMode(ModeEnum.PARALLEL);
 
-            // État des APIs (pour le monitoring)
             ApiStatus apiStatus = new ApiStatus();
             apiStatus.setWeatherApiAvailable(!response.getWeather().getFallback());
             apiStatus.setEventsApiAvailable(!response.getEvents().isEmpty());
@@ -80,8 +75,7 @@ public class AgendaService {
             return response;
 
         } catch (Exception e) {
-            // Propagation des exceptions métier
-            log.error("❌ [PARALLEL] Erreur pour {}: {}", city, e.getMessage());
+            log.error("❌ [PARALLEL] Error for {}: {}", city, e.getMessage());
 
             if (e.getCause() instanceof CityNotFoundException) {
                 throw (CityNotFoundException) e.getCause();
@@ -89,31 +83,29 @@ public class AgendaService {
             if (e.getCause() instanceof ExternalApiException) {
                 throw (ExternalApiException) e.getCause();
             }
-            throw new RuntimeException("Erreur lors de la construction de l'agenda pour " + city, e);
+            throw new RuntimeException("Failed to build agenda for " + city, e);
         }
     }
 
     /**
-     * Construit l'agenda en MODE SÉQUENTIEL (pour comparaison).
-     * Les 3 appels sont exécutés l'un après l'autre.
-     * Temps d'exécution = SOMME des 3 latences.
-     *
-     * @param city Ville recherchée
-     * @param date Date des événements
-     * @return AgendaResponse contenant météo + événements + recommandations
+     * Builds agenda in SEQUENTIAL mode (for comparison).
+     * Recommendations are generated AFTER weather is retrieved.
      */
     public AgendaResponse buildAgendaSequential(String city, String date) {
         long startTime = System.currentTimeMillis();
-        log.info(" [SEQUENTIAL] Début de l'agenda pour {} le {}", city, date);
+        log.info(" [SEQUENTIAL] Starting agenda for {} on {}", city, date);
 
         try {
 
             WeatherResponse weather = weatherService.getWeather(city).join();
             List<EventResponse> events = eventService.getEvents(city, date).join();
-            List<RecommendationResponse> recommendations = recommendationService.getRecommendations(city).join();
+
+
+            List<RecommendationResponse> recommendations =
+                    recommendationService.getRecommendations(city, weather).join();
 
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info("✅ [SEQUENTIAL] Agenda construit en {}ms pour {}", processingTime, city);
+            log.info(" [SEQUENTIAL] Agenda built in {}ms for {}", processingTime, city);
 
             AgendaResponse response = new AgendaResponse();
             response.setCity(city);
@@ -133,7 +125,7 @@ public class AgendaService {
             return response;
 
         } catch (Exception e) {
-            log.error("❌ [SEQUENTIAL] Erreur pour {}: {}", city, e.getMessage());
+            log.error("❌ [SEQUENTIAL] Error for {}: {}", city, e.getMessage());
 
             if (e.getCause() instanceof CityNotFoundException) {
                 throw (CityNotFoundException) e.getCause();
@@ -141,17 +133,10 @@ public class AgendaService {
             if (e.getCause() instanceof ExternalApiException) {
                 throw (ExternalApiException) e.getCause();
             }
-            throw new RuntimeException("Erreur lors de la construction séquentielle pour " + city, e);
+            throw new RuntimeException("Failed to build sequential agenda for " + city, e);
         }
     }
 
-    /**
-     * Calcule le gain de performance du mode parallèle par rapport au mode séquentiel.
-     *
-     * @param sequentialTime Temps séquentiel en ms
-     * @param parallelTime Temps parallèle en ms
-     * @return Facteur d'accélération (ex: 3.5x)
-     */
     public double calculateSpeedup(long sequentialTime, long parallelTime) {
         if (parallelTime == 0) return 0;
         return (double) sequentialTime / parallelTime;
