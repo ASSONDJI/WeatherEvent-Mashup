@@ -1,32 +1,198 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: WeatherEvent Mashup API
-  description: Professional mashup combining weather, events and recommendations
+  description: |
+    ## 🌤️ WeatherEvent Mashup
+    
+    Une API qui combine :
+    - **Météo** (OpenWeatherMap)
+    - **Événements culturels** (Ticketmaster)
+    - **Recommandations personnalisées** (Service interne)
+    
+    ### Concepts démontrés :
+    - Appels parallèles avec CompletableFuture.allOf()
+    - Cache Redis
+    - Circuit Breaker Resilience4j
   version: 1.0.0
   contact:
-    name: Middleware Course
+    name: Malaïka Ladéesse Assondji
     email: middleware@univ-cm
 
 servers:
   - url: http://localhost:8080/api/v1
-    description: Local Development Server
+    description: Serveur de développement local
 
 tags:
   - name: Agenda
-    description: Mashup endpoints combining weather, events and recommendations
+    description: 📋 Endpoints principaux - Mashup météo + événements + recommandations
+  - name: Benchmark
+    description: 📊 Comparaison des performances (séquentiel vs parallèle)
   - name: Health
-    description: Health check and monitoring
+    description: ❤️ Monitoring et santé du service
+
+paths:
+  /agenda:
+    get:
+      tags:
+        - Agenda
+      summary: Obtenir l'agenda complet
+      description: |
+        Combine en **appels parallèles** :
+        - Météo pour la ville
+        - Événements culturels
+        - Recommandations personnalisées
+        
+        ⚡ **Performance** : Temps = max(latences) au lieu de somme
+      operationId: getAgenda
+      parameters:
+        - name: city
+          in: query
+          required: true
+          description: Nom de la ville
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+            pattern: "^[a-zA-Z\\s-]+$"
+          example: Paris
+        - name: date
+          in: query
+          required: true
+          description: Date au format YYYY-MM-DD
+          schema:
+            type: string
+            format: date
+            pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+          example: 2024-12-25
+      responses:
+        '200':
+          description: Agenda construit avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgendaResponse'
+              example:
+                city: Paris
+                date: 2024-12-25
+                weather:
+                  city: Paris
+                  condition: Sunny
+                  temperature: 22.5
+                  feelsLike: 23.0
+                  humidity: 65
+                  description: Pleasant weather
+                  fallback: false
+                events:
+                  - id: "1"
+                    name: Jazz Festival
+                    venue: Downtown Theater
+                    city: Paris
+                    category: Music
+                recommendations:
+                  - id: "1"
+                    activity: Visit Historic Center
+                    venue: Paris Old Town
+                    reason: Beautiful architecture
+                    priority: 1
+                    indoor: false
+                processingTimeMs: 312
+                mode: PARALLEL
+        '400':
+          description: Paramètres invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ville non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agenda/benchmark:
+    get:
+      tags:
+        - Benchmark
+      summary: Comparer les performances
+      description: |
+        Compare le temps d'exécution entre :
+        - **Mode Séquentiel** : somme des latences
+        - **Mode Parallèle** : maximum des latences
+        
+        📊 **Gain attendu** : 2x à 3x plus rapide
+      operationId: benchmarkAgenda
+      parameters:
+        - name: city
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Paris
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: 2024-12-25
+      responses:
+        '200':
+          description: Benchmark complété
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchmarkResult'
+              example:
+                sequentialTimeMs: 550
+                parallelTimeMs: 200
+                speedupFactor: 2.75
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Vérification de santé
+      description: Retourne l'état du service (UP/DOWN/DEGRADED)
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service en bonne santé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/circuit-breakers:
+    get:
+      tags:
+        - Health
+      summary: État des circuit breakers
+      description: Affiche l'état de chaque circuit breaker (CLOSED/OPEN/HALF_OPEN)
+      operationId: getCircuitBreakerStatus
+      responses:
+        '200':
+          description: États des circuit breakers
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                  enum: [CLOSED, OPEN, HALF_OPEN]
+              example:
+                weatherApi: CLOSED
+                eventsApi: CLOSED
+                recommendationsApi: CLOSED
 
 components:
   schemas:
-    # ===== ENUMS =====
     ModeEnum:
       type: string
       enum:
         - PARALLEL
         - SEQUENTIAL
-      default: PARALLEL
-      description: Execution mode for API calls
+      description: Mode d'exécution
 
     StatusEnum:
       type: string
@@ -34,113 +200,105 @@ components:
         - UP
         - DOWN
         - DEGRADED
-      default: UP
-      description: Service health status
+      description: Statut du service
 
-    # ===== RESPONSE DTOs =====
     WeatherResponse:
       type: object
       properties:
         city:
           type: string
-          example: "Paris"
+          description: Nom de la ville
         condition:
           type: string
-          example: "Sunny"
+          description: Condition météo (Sunny, Rainy, etc.)
         temperature:
           type: number
           format: double
-          example: 22.5
+          description: Température en degrés Celsius
         feelsLike:
           type: number
           format: double
-          example: 23.0
+          description: Température ressentie
         humidity:
           type: integer
-          example: 65
+          description: Humidité en pourcentage
         description:
           type: string
-          example: "Clear sky with light clouds"
+          description: Description textuelle de la météo
         fallback:
           type: boolean
-          default: false
+          description: Indique si c'est une réponse de secours
         cachedAt:
           type: string
           format: date-time
-          example: "2024-12-25T10:30:00Z"
+          description: Date de mise en cache
 
     EventResponse:
       type: object
       properties:
         id:
           type: string
-          example: "evt-123"
+          description: Identifiant unique
         name:
           type: string
-          example: "Jazz Festival"
+          description: Nom de l'événement
         venue:
           type: string
-          example: "Downtown Theater"
+          description: Lieu de l'événement
         city:
           type: string
-          example: "Paris"
+          description: Ville
         category:
           type: string
-          example: "Music"
-        imageUrl:
-          type: string
-          format: uri
-          example: "https://example.com/image.jpg"
+          description: Catégorie (Music, Art, etc.)
         fallback:
           type: boolean
-          default: false
+          description: Indique si c'est une réponse de secours
 
     RecommendationResponse:
       type: object
       properties:
         id:
           type: string
-          example: "rec-1"
+          description: Identifiant unique
         activity:
           type: string
-          example: "Visit Historic Center"
+          description: Activité recommandée
         venue:
           type: string
-          example: "Paris Old Town"
+          description: Lieu recommandé
         reason:
           type: string
-          example: "Beautiful architecture and rich history"
+          description: Raison de la recommandation
         priority:
           type: integer
           minimum: 1
           maximum: 5
-          example: 1
+          description: Priorité (1 = plus recommandé)
         indoor:
           type: boolean
-          example: false
+          description: Activité en intérieur ?
 
     ApiStatus:
       type: object
       properties:
         weatherApiAvailable:
           type: boolean
-          example: true
+          description: API météo disponible ?
         eventsApiAvailable:
           type: boolean
-          example: true
+          description: API événements disponible ?
         recommendationsApiAvailable:
           type: boolean
-          example: true
+          description: Service recommandations disponible ?
 
     AgendaResponse:
       type: object
       properties:
         city:
           type: string
-          example: "Paris"
         date:
           type: string
-          example: "2024-12-25"
         weather:
           $ref: '#/components/schemas/WeatherResponse'
         events:
@@ -154,7 +312,7 @@ components:
         processingTimeMs:
           type: integer
           format: int64
-          example: 312
+          description: Temps d'exécution en millisecondes
         mode:
           $ref: '#/components/schemas/ModeEnum'
         apiStatus:
@@ -166,15 +324,15 @@ components:
         sequentialTimeMs:
           type: integer
           format: int64
-          example: 900
+          description: Temps en mode séquentiel (ms)
         parallelTimeMs:
           type: integer
           format: int64
-          example: 312
+          description: Temps en mode parallèle (ms)
         speedupFactor:
           type: number
           format: double
-          example: 2.88
+          description: Facteur d'accélération (seq/par)
         sequentialResponse:
           $ref: '#/components/schemas/AgendaResponse'
         parallelResponse:
@@ -187,13 +345,14 @@ components:
           $ref: '#/components/schemas/StatusEnum'
         service:
           type: string
-          example: "WeatherEventMashup"
+          description: Nom du service
         version:
           type: string
-          example: "1.0.0"
+          description: Version de l'API
         timestamp:
           type: string
           format: date-time
+          description: Horodatage
 
     ErrorResponse:
       type: object
@@ -203,119 +362,16 @@ components:
           format: date-time
         status:
           type: integer
-          example: 404
+          description: Code HTTP
         error:
           type: string
-          example: "City Not Found"
+          description: Type d'erreur
         message:
           type: string
-          example: "City 'InvalidCity' not found"
+          description: Message détaillé
         path:
           type: string
-          example: "/api/v1/agenda"
-
-  parameters:
-    CityParam:
-      name: city
-      in: query
-      required: true
-      schema:
-        type: string
-        minLength: 2
-        maxLength: 100
-        pattern: "^[a-zA-Z\\s-]+$"
-      example: "Paris"
-      description: "City name (letters, spaces, hyphens only)"
-
-    DateParam:
-      name: date
-      in: query
-      required: true
-      schema:
-        type: string
-        format: date
-        pattern: "^\\d{4}-\\d{2}-\\d{2}$"
-      example: "2024-12-25"
-      description: "Date in YYYY-MM-DD format"
-
-paths:
-  /agenda:
-    get:
-      tags: [Agenda]
-      summary: Get complete agenda (weather + events + recommendations)
-      description: Returns a complete agenda using PARALLEL calls to all services
-      operationId: getAgenda
-      parameters:
-        - $ref: '#/components/parameters/CityParam'
-        - $ref: '#/components/parameters/DateParam'
-      responses:
-        '200':
-          description: Agenda successfully built
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AgendaResponse'
-        '400':
-          description: Invalid parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: City not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /agenda/benchmark:
-    get:
-      tags: [Agenda]
-      summary: Compare sequential vs parallel performance
-      description: Returns benchmark results comparing SEQUENTIAL and PARALLEL execution times
-      operationId: benchmarkAgenda
-      parameters:
-        - $ref: '#/components/parameters/CityParam'
-        - $ref: '#/components/parameters/DateParam'
-      responses:
-        '200':
-          description: Benchmark completed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BenchmarkResult'
-
-  /health:
-    get:
-      tags: [Health]
-      summary: Health check endpoint
-      operationId: healthCheck
-      responses:
-        '200':
-          description: Service is healthy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-
-  /health/circuit-breakers:
-    get:
-      tags: [Health]
-      summary: Get circuit breaker status
-      operationId: getCircuitBreakerStatus
-      responses:
-        '200':
-          description: Circuit breaker status
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: string
-                  enum: [CLOSED, OPEN, HALF_OPEN]
+          description: Chemin de la requête
+        requestId:
+          type: string
+          description: Identifiant de requête

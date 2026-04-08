@@ -14,10 +14,16 @@ public class EventService {
 
     @Cacheable(value = "events", key = "#city + '_' + #date")
     public CompletableFuture<List<EventResponse>> getEvents(String city, String date) {
-        log.info("🎭 Fetching events for: {} on {}", city, date);
+        log.info(" Fetching events for: {} on {}", city, date);
+
+        if (city == null || city.trim().isEmpty()) {
+            throw new IllegalArgumentException("City parameter cannot be null or empty");
+        }
 
         return CompletableFuture.supplyAsync(() -> {
-            try { Thread.sleep(200); } catch (InterruptedException e) {}
+            try { Thread.sleep(200); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
             EventResponse event1 = new EventResponse();
             event1.setId("1");

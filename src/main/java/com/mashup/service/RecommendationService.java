@@ -17,7 +17,9 @@ public class RecommendationService {
         log.info("💡 Generating recommendations for: {}", city);
 
         return CompletableFuture.supplyAsync(() -> {
-            try { Thread.sleep(150); } catch (InterruptedException e) {}
+            try { Thread.sleep(150); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
 
             RecommendationResponse rec1 = new RecommendationResponse();
             rec1.setId("1");

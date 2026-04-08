@@ -3,6 +3,14 @@ package com.mashup.controller;
 import com.mashup.dto.generated.AgendaResponse;
 import com.mashup.dto.generated.BenchmarkResult;
 import com.mashup.service.AgendaService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -15,24 +23,119 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
+@Tag(name = "Agenda", description = "📋 Endpoints principaux - Mashup météo + événements + recommandations")
 public class AgendaControllerImpl {
 
     private final AgendaService agendaService;
 
     @GetMapping("/agenda")
+    @Operation(
+            summary = "Obtenir l'agenda complet",
+            description = """
+            Combine en **appels parallèles** :
+            - Météo pour la ville
+            - Événements culturels
+            - Recommandations personnalisées
+            
+            ⚡ **Performance** : Temps = max(latences) au lieu de somme
+            """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Agenda construit avec succès",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "success",
+                                    value = """
+                    {
+                        "city": "Paris",
+                        "date": "2024-12-25",
+                        "weather": {
+                            "city": "Paris",
+                            "condition": "Sunny",
+                            "temperature": 22.5,
+                            "feelsLike": 23.0,
+                            "humidity": 65,
+                            "description": "Pleasant weather",
+                            "fallback": false
+                        },
+                        "events": [
+                            {
+                                "id": "1",
+                                "name": "Jazz Festival",
+                                "venue": "Downtown Theater",
+                                "city": "Paris",
+                                "category": "Music"
+                            }
+                        ],
+                        "recommendations": [
+                            {
+                                "id": "1",
+                                "activity": "Visit Historic Center",
+                                "venue": "Paris Old Town",
+                                "reason": "Beautiful architecture",
+                                "priority": 1,
+                                "indoor": false
+                            }
+                        ],
+                        "processingTimeMs": 312,
+                        "mode": "PARALLEL"
+                    }
+                    """
+                            )
+                    )
+            ),
+            @ApiResponse(responseCode = "400", description = "Paramètres invalides"),
+            @ApiResponse(responseCode = "404", description = "Ville non trouvée")
+    })
     public ResponseEntity<AgendaResponse> getAgenda(
+            @Parameter(description = "Nom de la ville", example = "Paris", required = true)
             @RequestParam String city,
+            @Parameter(description = "Date au format YYYY-MM-DD", example = "2024-12-25", required = true)
             @RequestParam String date) {
-        log.info(" GET /agenda - city: {}, date: {}", city, date);
+        log.info("📥 GET /agenda - city: {}, date: {}", city, date);
         AgendaResponse response = agendaService.buildAgendaParallel(city, date);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/agenda/benchmark")
+    @Operation(
+            summary = "Comparer les performances",
+            description = """
+            Compare le temps d'exécution entre :
+            - **Mode Séquentiel** : somme des latences
+            - **Mode Parallèle** : maximum des latences
+            
+            📊 **Gain attendu** : 2x à 3x plus rapide
+            """
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Benchmark complété",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "success",
+                                    value = """
+                    {
+                        "sequentialTimeMs": 550,
+                        "parallelTimeMs": 200,
+                        "speedupFactor": 2.75
+                    }
+                    """
+                            )
+                    )
+            )
+    })
     public ResponseEntity<BenchmarkResult> benchmark(
+            @Parameter(description = "Nom de la ville", example = "Paris", required = true)
             @RequestParam String city,
+            @Parameter(description = "Date au format YYYY-MM-DD", example = "2024-12-25", required = true)
             @RequestParam String date) {
-        log.info(" GET /agenda/benchmark - city: {}, date: {}", city, date);
+        log.info("📊 GET /agenda/benchmark - city: {}, date: {}", city, date);
 
         long seqStart = System.currentTimeMillis();
         AgendaResponse sequential = agendaService.buildAgendaSequential(city, date);
@@ -51,7 +154,7 @@ public class AgendaControllerImpl {
         result.setSequentialResponse(sequential);
         result.setParallelResponse(parallel);
 
-        log.info("Benchmark - Sequential: {}ms, Parallel: {}ms, Speedup: {}x",
+        log.info("📊 Benchmark - Sequential: {}ms, Parallel: {}ms, Speedup: {}x",
                 sequentialTime, parallelTime, String.format("%.2f", speedup));
 
         return ResponseEntity.ok(result);
