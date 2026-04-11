@@ -3,20 +3,20 @@ spring:
     name: weather-event-mashup
   profiles:
     active: local
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mashup_db}
+    username: ${SPRING_DATASOURCE_USERNAME:mashup}
+    password: ${SPRING_DATASOURCE_PASSWORD:mashup123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
   cache:
-    type: redis
-    redis:
-      time-to-live: 600000
-      cache-null-values: false
-  redis:
-    host: localhost
-    port: 6379
-    timeout: 2000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
+    type: simple
   jackson:
     serialization:
       fail-on-empty-beans: false
@@ -31,8 +31,10 @@ server:
 
 api:
   openweather:
+    key: ${OPENWEATHER_API_KEY:}
     url: https://api.openweathermap.org/data/2.5
   ticketmaster:
+    key: ${TICKETMASTER_API_KEY:}
     url: https://app.ticketmaster.com/discovery/v2
 
 resilience4j:
@@ -60,11 +62,18 @@ resilience4j:
         wait-duration-in-open-state: 30s
         failure-rate-threshold: 50
 
+mock:
+  weather:
+    enabled: false
+  events:
+    enabled: false
+  recommendations:
+    enabled: true
+
 logging:
   level:
     com.mashup: DEBUG
     io.github.resilience4j: INFO
-    org.springframework.cache: DEBUG
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
@@ -72,7 +81,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,circuitbreakers,caches
+        include: health,info,metrics,circuitbreakers
   endpoint:
     health:
       show-details: always

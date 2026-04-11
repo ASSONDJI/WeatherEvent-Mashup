@@ -1,4 +1,4 @@
-import { Event } from '../types';
+import type { Event } from '../types';
 import { Calendar, MapPin, Music, Palette, Utensils, AlertCircle } from 'lucide-react';
 
 interface EventsListProps {

@@ -1,4 +1,4 @@
-import { Recommendation } from '../types';
+import type { Recommendation } from '../types';
 import { Home, Coffee, Landmark, Utensils, Building2, TreePine, Sparkles } from 'lucide-react';
 
 interface RecommendationsListProps {
