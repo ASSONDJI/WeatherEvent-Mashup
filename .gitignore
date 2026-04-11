@@ -108,3 +108,13 @@ build/
 # Temporary files
 *.tmp
 *.temp
+# Docker
+.env
+*.log
+*.pid
+*.pid.lock
+
+# Variables d'environnement
+.env
+.env.local
+.env.*.local

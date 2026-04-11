@@ -17,13 +17,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - mashup-network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: mashup-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,6 +34,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - mashup-network
+    restart: unless-stopped
 
   redis-commander:
     image: rediscommander/redis-commander:latest
@@ -41,6 +47,47 @@ services:
       - "8081:8081"
     depends_on:
       - redis
+    networks:
+      - mashup-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mashup-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/mashup_db
+      - SPRING_DATASOURCE_USERNAME=mashup
+      - SPRING_DATASOURCE_PASSWORD=mashup123
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mashup-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: mashup-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - mashup-network
+    restart: unless-stopped
+
+networks:
+  mashup-network:
+    driver: bridge
 
 volumes:
   postgres_data:

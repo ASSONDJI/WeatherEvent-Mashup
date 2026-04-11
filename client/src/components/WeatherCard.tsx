@@ -1,4 +1,4 @@
-import { Weather } from '../types';
+import type { Weather } from '../types';
 import { Sun, Cloud, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
 
 interface WeatherCardProps {

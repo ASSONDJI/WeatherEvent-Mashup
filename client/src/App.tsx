@@ -1,54 +1,94 @@
-import { useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
-import {
-  Search,
-  TrendingUp,
-  Activity,
-  Zap,
-  Sparkles,
-  CalendarDays,
-  MapPin,
-  Loader2,
-} from "lucide-react";
+import { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
+import { 
+  Search, TrendingUp, Activity, Zap, Sparkles, CalendarDays, 
+  MapPin, Loader2, CloudRain, Sun, Cloud, CloudSnow, 
+  Wind, Droplets, Thermometer, Coffee, Home, Landmark, 
+  Utensils, Building2, TreePine, Music, Palette, 
+  AlertCircle, Compass, Award, Clock, CheckCircle2, X,
+  ChevronRight, Heart, Star
+} from 'lucide-react';
+
+interface Weather {
+  city: string;
+  condition: string;
+  temperature: number;
+  feelsLike: number;
+  humidity: number;
+  description: string;
+  fallback: boolean;
+  cachedAt: string;
+}
+
+interface Event {
+  id: string;
+  name: string;
+  venue: string;
+  city: string;
+  category: string;
+  fallback: boolean;
+}
+
+interface Recommendation {
+  id: string;
+  activity: string;
+  venue: string;
+  reason: string;
+  priority: number;
+  indoor: boolean;
+}
+
+interface ApiStatus {
+  weatherApiAvailable: boolean;
+  eventsApiAvailable: boolean;
+  recommendationsApiAvailable: boolean;
+}
+
+interface AgendaResponse {
+  city: string;
+  date: string;
+  weather: Weather;
+  events: Event[];
+  recommendations: Recommendation[];
+  processingTimeMs: number;
+  mode: string;
+  apiStatus: ApiStatus;
+}
+
+interface BenchmarkResult {
+  sequentialTimeMs: number;
+  parallelTimeMs: number;
+  speedupFactor: number;
+  sequentialResponse: AgendaResponse;
+  parallelResponse: AgendaResponse;
+}
 
 function App() {
-  const [city, setCity] = useState("Paris");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [city, setCity] = useState('Paris');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [benchmark, setBenchmark] = useState(null);
+  const [data, setData] = useState<AgendaResponse | null>(null);
+  const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [showBenchmark, setShowBenchmark] = useState(false);
 
-  const cities = [
-    "Paris",
-    "London",
-    "New York",
-    "Tokyo",
-    "Douala",
-    "Dschang",
-    "Yaounde",
-  ];
+  const cities = ['Paris', 'London', 'New York', 'Tokyo', 'Douala', 'Dschang', 'Yaounde'];
 
   const handleSearch = async () => {
     if (!city.trim()) {
-      toast.error("Please enter a city name");
+      toast.error('Please enter a city name');
       return;
     }
 
     setLoading(true);
     setShowBenchmark(false);
-
+    
     try {
-      const response = await fetch(
-        `http://localhost:8080/api/v1/agenda?city=${encodeURIComponent(city)}&date=${date}`,
-      );
+      const response = await fetch(`http://localhost:8080/api/v1/agenda?city=${encodeURIComponent(city)}&date=${date}`);
       const result = await response.json();
       setData(result);
-      toast.success(
-        `Agenda loaded for ${city} in ${result.processingTimeMs}ms`,
-      );
+      toast.success(`Agenda loaded for ${city}`);
     } catch (error) {
-      toast.error("Failed to load agenda");
+      toast.error('Failed to load agenda');
     } finally {
       setLoading(false);
     }
@@ -56,289 +96,316 @@ function App() {
 
   const handleBenchmark = async () => {
     if (!city.trim()) {
-      toast.error("Please enter a city name");
+      toast.error('Please enter a city name');
       return;
     }
 
     setLoading(true);
-
+    
     try {
-      const response = await fetch(
-        `http://localhost:8080/api/v1/agenda/benchmark?city=${encodeURIComponent(city)}&date=${date}`,
-      );
+      const response = await fetch(`http://localhost:8080/api/v1/agenda/benchmark?city=${encodeURIComponent(city)}&date=${date}`);
       const result = await response.json();
       setBenchmark(result);
       setShowBenchmark(true);
       toast.success(`Benchmark: ${result.speedupFactor.toFixed(2)}x faster!`);
     } catch (error) {
-      toast.error("Failed to run benchmark");
+      toast.error('Failed to run benchmark');
     } finally {
       setLoading(false);
     }
   };
 
+  const getWeatherIcon = (condition: string) => {
+    const cond = condition.toLowerCase();
+    if (cond.includes('rain') || cond.includes('drizzle')) return <CloudRain className="w-16 h-16 text-blue-400" />;
+    if (cond.includes('snow')) return <CloudSnow className="w-16 h-16 text-white" />;
+    if (cond.includes('clear') || cond.includes('sun')) return <Sun className="w-16 h-16 text-yellow-400" />;
+    return <Cloud className="w-16 h-16 text-gray-400" />;
+  };
+
+  const getCategoryIcon = (category: string) => {
+    const cat = category.toLowerCase();
+    if (cat.includes('music')) return <Music className="w-5 h-5" />;
+    if (cat.includes('art')) return <Palette className="w-5 h-5" />;
+    if (cat.includes('food')) return <Utensils className="w-5 h-5" />;
+    return <CalendarDays className="w-5 h-5" />;
+  };
+
+  const getActivityIcon = (activity: string, indoor: boolean) => {
+    const act = activity.toLowerCase();
+    if (act.includes('historic')) return <Landmark className="w-5 h-5" />;
+    if (act.includes('cuisine') || act.includes('food')) return <Utensils className="w-5 h-5" />;
+    if (act.includes('museum') || act.includes('art')) return <Building2 className="w-5 h-5" />;
+    if (act.includes('park')) return <TreePine className="w-5 h-5" />;
+    if (act.includes('coffee')) return <Coffee className="w-5 h-5" />;
+    if (indoor) return <Home className="w-5 h-5" />;
+    return <Compass className="w-5 h-5" />;
+  };
+
   return (
-    <div className="min-h-screen py-8 px-4">
-      <Toaster
-        position="top-right"
-        toastOptions={{ style: { background: "#1e1e2e", color: "#fff" } }}
-      />
-
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm mb-4">
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="text-sm text-white/80">
-              Weather-Based Recommendations
-            </span>
-          </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent mb-2">
-            WeatherEvent Mashup
-          </h1>
-          <p className="text-white/60">
-            Get personalized recommendations based on weather and local events
-          </p>
+    <div className="container">
+      <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' } }} />
+      
+      {/* Header */}
+      <div className="header animate-fade-in">
+        <div className="badge">
+          <Sparkles className="w-4 h-4" />
+          AI-Powered Travel Assistant
         </div>
+        <h1>WeatherEvent Mashup</h1>
+        <p className="subtitle">Personalized recommendations based on real-time weather</p>
+      </div>
 
-        {/* Search Bar */}
-        <div className="glass-card p-6 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm text-white/60 mb-1">City</label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
+      {/* Search Section */}
+      <div className="search-section animate-fade-in">
+        <div className="search-card">
+          <div className="search-form">
+            <div className="input-group">
+              <label>DESTINATION</label>
+              <div className="input-wrapper">
+                <MapPin className="input-icon" />
                 <input
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Enter city name..."
-                  className="glass-input w-full pl-10"
                   list="cities"
                 />
                 <datalist id="cities">
-                  {cities.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
+                  {cities.map(c => <option key={c} value={c} />)}
                 </datalist>
               </div>
             </div>
-            <div className="flex-1">
-              <label className="block text-sm text-white/60 mb-1">Date</label>
-              <div className="relative">
-                <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
+            <div className="input-group">
+              <label>TRAVEL DATE</label>
+              <div className="input-wrapper">
+                <CalendarDays className="input-icon" />
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="glass-input w-full pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-3 items-end">
-              <button
-                onClick={handleSearch}
-                disabled={loading}
-                className="btn-primary flex items-center gap-2"
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Search className="w-5 h-5" />
-                )}
+            <div className="button-group">
+              <button onClick={handleSearch} disabled={loading} className="btn-primary">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 Explore
               </button>
-              <button
-                onClick={handleBenchmark}
-                disabled={loading}
-                className="px-6 py-3 rounded-xl border border-white/20 text-white hover:bg-white/10 transition-all flex items-center gap-2"
-              >
-                <TrendingUp className="w-5 h-5" />
+              <button onClick={handleBenchmark} disabled={loading} className="btn-secondary">
+                <TrendingUp className="w-4 h-4" />
                 Benchmark
               </button>
             </div>
           </div>
+          <div className="quick-cities">
+            {cities.slice(0, 6).map(c => (
+              <span key={c} className="city-chip" onClick={() => setCity(c)}>{c}</span>
+            ))}
+          </div>
         </div>
+      </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
-            <p className="text-white/60">Fetching data from APIs...</p>
+      {/* Status Bar */}
+      {data && !loading && !showBenchmark && (
+        <div className="status-bar animate-fade-in">
+          <div className="status-text">
+            <Clock className="w-3 h-3" />
+            <span>{data.processingTimeMs}ms</span>
           </div>
-        )}
+          <div className="status-text">
+            <Activity className="w-3 h-3" />
+            <span>API Status:</span>
+          </div>
+          <span className={`status-badge ${data.apiStatus.weatherApiAvailable ? 'status-success' : 'status-error'}`}>
+            Weather {data.apiStatus.weatherApiAvailable ? '✓' : '✗'}
+          </span>
+          <span className={`status-badge ${data.apiStatus.eventsApiAvailable ? 'status-success' : 'status-error'}`}>
+            Events {data.apiStatus.eventsApiAvailable ? '✓' : '✗'}
+          </span>
+          <span className={`status-badge ${data.apiStatus.recommendationsApiAvailable ? 'status-success' : 'status-error'}`}>
+            Recos {data.apiStatus.recommendationsApiAvailable ? '✓' : '✗'}
+          </span>
+        </div>
+      )}
 
-        {/* Benchmark Results */}
-        {showBenchmark && benchmark && !loading && (
-          <div className="glass-card p-6 mb-8 border border-green-500/30">
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-5 h-5 text-green-400" />
-              <h3 className="text-lg font-semibold text-white">
-                Performance Benchmark
-              </h3>
+      {/* Benchmark Card */}
+      {showBenchmark && benchmark && !loading && (
+        <div className="benchmark-card animate-fade-in">
+          <div className="benchmark-header">
+            <div className="benchmark-title">
+              <Zap className="w-5 h-5 text-blue-400" />
+              Performance Benchmark
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-xl bg-white/5">
-                <p className="text-sm text-white/50">Sequential Mode</p>
-                <p className="text-2xl font-bold text-orange-400">
-                  {benchmark.sequentialTimeMs}ms
-                </p>
-              </div>
-              <div className="text-center p-4 rounded-xl bg-white/5">
-                <p className="text-sm text-white/50">Parallel Mode</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {benchmark.parallelTimeMs}ms
-                </p>
-              </div>
-              <div className="text-center p-4 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20">
-                <p className="text-sm text-white/50">Speedup Factor</p>
-                <p className="text-2xl font-bold text-purple-400">
-                  {benchmark.speedupFactor.toFixed(2)}x
-                </p>
-              </div>
+            <button className="close-btn" onClick={() => setShowBenchmark(false)}>×</button>
+          </div>
+          <div className="benchmark-grid">
+            <div className="benchmark-item">
+              <div className="benchmark-value benchmark-value-sequential">{benchmark.sequentialTimeMs}ms</div>
+              <div className="benchmark-label">Sequential Mode</div>
             </div>
-            <div className="mt-4 p-3 rounded-lg bg-white/5 text-center">
-              <p className="text-sm text-white/60">
-                Parallel mode is{" "}
-                <span className="text-green-400 font-bold">
-                  {benchmark.speedupFactor.toFixed(1)}x faster
-                </span>{" "}
-                than sequential mode!
-              </p>
+            <div className="benchmark-item">
+              <div className="benchmark-value benchmark-value-parallel">{benchmark.parallelTimeMs}ms</div>
+              <div className="benchmark-label">Parallel Mode</div>
+            </div>
+            <div className="benchmark-item">
+              <div className="benchmark-value benchmark-value-speedup">{benchmark.speedupFactor.toFixed(2)}x</div>
+              <div className="benchmark-label">Speedup Factor</div>
             </div>
           </div>
-        )}
+          <div className="benchmark-note">
+            Parallel mode is <strong className="text-green-400">{benchmark.speedupFactor.toFixed(1)}x faster</strong> than sequential mode!
+          </div>
+        </div>
+      )}
 
-        {/* Results */}
-        {data && !loading && !showBenchmark && (
-          <div className="space-y-6">
-            {/* API Status */}
-            <div className="flex items-center justify-center gap-3 text-sm">
-              <div className="flex items-center gap-1">
-                <Activity className="w-3 h-3" />
-                <span className="text-white/60">API Status:</span>
+      {/* Loading State */}
+      {loading && (
+        <div className="loading animate-fade-in">
+          <div className="spinner"></div>
+          <p style={{ color: '#64748b' }}>Fetching weather data...</p>
+        </div>
+      )}
+
+      {/* Results */}
+      {data && !loading && !showBenchmark && (
+        <div className="animate-fade-in">
+          {/* Main Weather Card */}
+          <div className="weather-main">
+            <div className="weather-header">
+              <div>
+                <div className="weather-city">
+                  <MapPin className="w-4 h-4" />
+                  {data.weather.city}
+                </div>
+                <div className="weather-temp-large">{Math.round(data.weather.temperature)}°</div>
+                <div className="weather-condition">{data.weather.condition}</div>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs ${data.apiStatus?.weatherApiAvailable ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-              >
-                Weather {data.apiStatus?.weatherApiAvailable ? "✓" : "✗"}
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs ${data.apiStatus?.eventsApiAvailable ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-              >
-                Events {data.apiStatus?.eventsApiAvailable ? "✓" : "✗"}
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs ${data.apiStatus?.recommendationsApiAvailable ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-              >
-                Recos {data.apiStatus?.recommendationsApiAvailable ? "✓" : "✗"}
-              </span>
-              <span className="text-white/40 text-xs">
-                ⏱️ {data.processingTimeMs}ms
-              </span>
+              {getWeatherIcon(data.weather.condition)}
             </div>
-
-            {/* Weather Card */}
-            {data.weather && (
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white/80">
-                      Weather
-                    </h3>
-                    <p className="text-3xl font-bold text-white">
-                      {data.weather.city}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-white/50">Temperature</p>
-                    <p className="text-xl font-bold text-white">
-                      {data.weather.temperature}°C
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/50">Feels like</p>
-                    <p className="text-xl font-bold text-white">
-                      {data.weather.feelsLike}°C
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/50">Humidity</p>
-                    <p className="text-xl font-bold text-white">
-                      {data.weather.humidity}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/50">Condition</p>
-                    <p className="text-lg font-semibold text-white">
-                      {data.weather.condition}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-4 text-white/70 text-center italic">
-                  "{data.weather.description}"
-                </p>
+            <div className="weather-details">
+              <div className="weather-detail-item">
+                <div className="weather-detail-value">{Math.round(data.weather.feelsLike)}°</div>
+                <div className="weather-detail-label">Feels Like</div>
               </div>
-            )}
+              <div className="weather-detail-item">
+                <div className="weather-detail-value">{data.weather.humidity}%</div>
+                <div className="weather-detail-label">Humidity</div>
+              </div>
+              <div className="weather-detail-item">
+                <div className="weather-detail-value">{data.weather.condition}</div>
+                <div className="weather-detail-label">Condition</div>
+              </div>
+              <div className="weather-detail-item">
+                <div className="weather-detail-value">—</div>
+                <div className="weather-detail-label">Wind</div>
+              </div>
+            </div>
+            <p className="weather-description" style={{ textAlign: 'center', marginTop: '1rem', color: '#64748b' }}>
+              "{data.weather.description}"
+            </p>
+          </div>
 
+          {/* Grid */}
+          <div className="grid-2">
             {/* Events */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold text-white/80 mb-4">
+            <div className="events-card">
+              <div className="card-title">
+                <CalendarDays className="w-5 h-5 text-blue-400" />
                 Upcoming Events
-              </h3>
-              {data.events && data.events.length > 0 ? (
-                <div className="space-y-3">
+              </div>
+              {data.events.length === 0 ? (
+                <div className="empty-events">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No events found</p>
+                  <p className="text-xs mt-1">Try another date</p>
+                </div>
+              ) : (
+                <div className="events-list">
                   {data.events.map((event, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-white/5">
-                      <h4 className="font-semibold text-white">{event.name}</h4>
-                      <p className="text-sm text-white/50">{event.venue}</p>
-                      <p className="text-sm text-purple-400 mt-1">
-                        {event.category}
-                      </p>
+                    <div key={idx} className="event-item">
+                      <div className="event-icon" style={{ color: '#60a5fa' }}>
+                        {getCategoryIcon(event.category)}
+                      </div>
+                      <div className="event-info">
+                        <div className="event-name">{event.name}</div>
+                        <div className="event-venue">{event.venue}</div>
+                        <span className="event-category">{event.category}</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-600" />
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-white/50 text-center py-8">
-                  No events found for this date
-                </p>
               )}
             </div>
 
-            {/* Recommendations */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold text-white/80 mb-4">
-                ✨ Personalized Recommendations
-              </h3>
-              <div className="space-y-3">
-                {data.recommendations &&
-                  data.recommendations.map((rec, idx) => (
-                    <div key={idx} className="p-4 rounded-xl bg-white/5">
-                      <h4 className="font-semibold text-white">
-                        {rec.activity}
-                      </h4>
-                      <p className="text-sm text-white/70">{rec.venue}</p>
-                      <p className="text-sm text-white/50 mt-1">{rec.reason}</p>
-                    </div>
-                  ))}
+            {/* Recommendations Preview */}
+            <div className="events-card">
+              <div className="card-title">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Top Pick
               </div>
+              {data.recommendations.length > 0 && (
+                <div className="event-item" style={{ cursor: 'pointer' }}>
+                  <div className="event-icon" style={{ color: '#f59e0b' }}>
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div className="event-info">
+                    <div className="event-name">{data.recommendations[0].activity}</div>
+                    <div className="event-venue">{data.recommendations[0].venue}</div>
+                    <span className="event-category">Recommended</span>
+                  </div>
+                  <Heart className="w-4 h-4 text-pink-500" />
+                </div>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Empty State */}
-        {!data && !loading && !showBenchmark && (
-          <div className="flex flex-col items-center justify-center py-20 text-white/40">
-            <Search className="w-16 h-16 mb-4 opacity-50" />
-            <p className="text-lg">Enter a city and date to get started</p>
-            <p className="text-sm">
-              Try "Paris", "London", "Douala", or "Dschang"
-            </p>
+          {/* Full Recommendations */}
+          <div className="recommendations-card">
+            <div className="card-title">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              Personalized Recommendations
+            </div>
+            <div className="recommendations-list">
+              {data.recommendations.map((rec) => (
+                <div key={rec.id} className="recommendation-item">
+                  <div className={`recommendation-border ${rec.indoor ? 'border-indoor' : 'border-outdoor'}`} />
+                  <div className="recommendation-content">
+                    <div className="recommendation-icon">
+                      {getActivityIcon(rec.activity, rec.indoor)}
+                    </div>
+                    <div className="recommendation-info">
+                      <div className="recommendation-title">
+                        {rec.activity}
+                        <span className={`recommendation-badge ${rec.indoor ? 'badge-indoor' : 'badge-outdoor'}`}>
+                          {rec.indoor ? 'Indoor' : 'Outdoor'}
+                        </span>
+                      </div>
+                      <div className="recommendation-venue">{rec.venue}</div>
+                      <div className="recommendation-reason">{rec.reason}</div>
+                    </div>
+                    <div className="recommendation-priority">
+                      <span className={rec.priority === 1 ? 'priority-high' : ''}>
+                        #{rec.priority}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!data && !loading && !showBenchmark && (
+        <div className="empty-state animate-fade-in">
+          <Compass className="empty-icon w-16 h-16 mx-auto" />
+          <p className="text-lg mb-2">Ready to explore?</p>
+          <p className="text-sm">Enter a city and date to discover personalized recommendations</p>
+        </div>
+      )}
     </div>
   );
 }
