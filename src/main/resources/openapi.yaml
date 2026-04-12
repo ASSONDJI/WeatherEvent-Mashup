@@ -232,6 +232,10 @@ components:
           type: string
           format: date-time
           description: Date de mise en cache
+        windSpeed:
+          type: number
+          format: double
+          description: Vitesse du vent en km/h
 
     EventResponse:
       type: object

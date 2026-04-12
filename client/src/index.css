@@ -20,7 +20,7 @@ body::before {
   right: 0;
   bottom: 0;
   background: radial-gradient(ellipse at 20% 30%, rgba(56, 139, 253, 0.15), transparent 50%),
-              radial-gradient(ellipse at 80% 70%, rgba(139, 92, 246, 0.1), transparent 50%);
+  radial-gradient(ellipse at 80% 70%, rgba(139, 92, 246, 0.1), transparent 50%);
   pointer-events: none;
   z-index: -1;
 }
