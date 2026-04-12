@@ -41,13 +41,10 @@ public class AgendaService {
         log.info(" [PARALLEL] Starting agenda for {} on {}", city, date);
 
         try {
-
             CompletableFuture<WeatherResponse> weatherFuture = weatherService.getWeather(city);
             CompletableFuture<List<EventResponse>> eventsFuture = eventService.getEvents(city, date);
 
-
             WeatherResponse weather = weatherFuture.join();
-
 
             CompletableFuture<List<RecommendationResponse>> recommendationsFuture =
                     recommendationService.getRecommendations(city, weather);
@@ -55,7 +52,7 @@ public class AgendaService {
             CompletableFuture.allOf(eventsFuture, recommendationsFuture).join();
 
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info("[PARALLEL] Agenda built in {}ms for {}", processingTime, city);
+            log.info(" [PARALLEL] Agenda built in {}ms for {}", processingTime, city);
 
             AgendaResponse response = new AgendaResponse();
             response.setCity(city);
@@ -75,7 +72,7 @@ public class AgendaService {
             return response;
 
         } catch (Exception e) {
-            log.error("❌ [PARALLEL] Error for {}: {}", city, e.getMessage());
+            log.error("[PARALLEL] Error for {}: {}", city, e.getMessage());
 
             if (e.getCause() instanceof CityNotFoundException) {
                 throw (CityNotFoundException) e.getCause();
@@ -96,16 +93,14 @@ public class AgendaService {
         log.info(" [SEQUENTIAL] Starting agenda for {} on {}", city, date);
 
         try {
-
             WeatherResponse weather = weatherService.getWeather(city).join();
             List<EventResponse> events = eventService.getEvents(city, date).join();
-
 
             List<RecommendationResponse> recommendations =
                     recommendationService.getRecommendations(city, weather).join();
 
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info(" [SEQUENTIAL] Agenda built in {}ms for {}", processingTime, city);
+            log.info("[SEQUENTIAL] Agenda built in {}ms for {}", processingTime, city);
 
             AgendaResponse response = new AgendaResponse();
             response.setCity(city);
@@ -125,7 +120,7 @@ public class AgendaService {
             return response;
 
         } catch (Exception e) {
-            log.error("❌ [SEQUENTIAL] Error for {}: {}", city, e.getMessage());
+            log.error(" [SEQUENTIAL] Error for {}: {}", city, e.getMessage());
 
             if (e.getCause() instanceof CityNotFoundException) {
                 throw (CityNotFoundException) e.getCause();
@@ -137,8 +132,45 @@ public class AgendaService {
         }
     }
 
+    /**
+     * Calcule le facteur d'accélération de manière sécurisée.
+     *
+     * Cas particuliers gérés :
+     * - parallelTime == 0 && sequentialTime == 0 → speedup = 1.0 (les deux sont instantanés)
+     * - parallelTime == 0 && sequentialTime > 0 → speedup = sequentialTime (parallèle infiniment plus rapide)
+     * - parallelTime > 0 && sequentialTime == 0 → speedup = 0 (séquentiel infiniment plus rapide)
+     * - parallelTime < 0 ou sequentialTime < 0 → speedup = 0 (temps invalide)
+     *
+     * @param sequentialTime Temps d'exécution séquentiel en millisecondes
+     * @param parallelTime Temps d'exécution parallèle en millisecondes
+     * @return Facteur d'accélération (>= 0)
+     */
     public double calculateSpeedup(long sequentialTime, long parallelTime) {
-        if (parallelTime == 0) return 0;
-        return (double) sequentialTime / parallelTime;
+
+        if (sequentialTime < 0 || parallelTime < 0) {
+            log.warn("Temps négatifs détectés - seq: {}ms, par: {}ms", sequentialTime, parallelTime);
+            return 0.0;
+        }
+
+
+        if (parallelTime == 0) {
+            if (sequentialTime == 0) {
+
+                return 1.0;
+            }
+
+            return (double) sequentialTime;
+        }
+
+
+        double speedup = (double) sequentialTime / parallelTime;
+
+
+        if (Double.isInfinite(speedup) || Double.isNaN(speedup)) {
+            log.warn("Valeur de speedup invalide détectée - seq: {}ms, par: {}ms", sequentialTime, parallelTime);
+            return 0.0;
+        }
+
+        return speedup;
     }
 }

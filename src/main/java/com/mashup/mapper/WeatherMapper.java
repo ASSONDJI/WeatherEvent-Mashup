@@ -16,6 +16,7 @@ public class WeatherMapper {
         WeatherResponse weatherResponse = new WeatherResponse();
         weatherResponse.setCity(response.getName() != null ? response.getName() : "Unknown");
 
+
         if (response.getMain() != null) {
             weatherResponse.setTemperature(response.getMain().getTemp());
             weatherResponse.setFeelsLike(response.getMain().getFeelsLike());
@@ -26,6 +27,7 @@ public class WeatherMapper {
             weatherResponse.setHumidity(0);
         }
 
+
         if (response.getWeather() != null && !response.getWeather().isEmpty()) {
             OpenWeatherResponse.Weather weather = response.getWeather().get(0);
             weatherResponse.setCondition(weather.getMain() != null ? weather.getMain() : "Unknown");
@@ -33,6 +35,13 @@ public class WeatherMapper {
         } else {
             weatherResponse.setCondition("Unknown");
             weatherResponse.setDescription("No weather data");
+        }
+
+
+        if (response.getWind() != null) {
+            weatherResponse.setWindSpeed(response.getWind().getSpeed());
+        } else {
+            weatherResponse.setWindSpeed(0.0);
         }
 
         weatherResponse.setFallback(false);
@@ -48,6 +57,7 @@ public class WeatherMapper {
         response.setDescription("Weather data temporarily unavailable");
         response.setFallback(true);
         response.setCachedAt(OffsetDateTime.now());
+        response.setWindSpeed(0.0);
         return response;
     }
 }

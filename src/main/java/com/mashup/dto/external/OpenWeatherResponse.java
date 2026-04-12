@@ -9,6 +9,7 @@ public class OpenWeatherResponse {
     private String name;
     private Main main;
     private List<Weather> weather;
+    private Wind wind;
 
     @Data
     public static class Main {
@@ -22,5 +23,9 @@ public class OpenWeatherResponse {
     public static class Weather {
         private String main;
         private String description;
+    }
+    @Data
+    public static class Wind {
+        private double speed;
     }
 }
