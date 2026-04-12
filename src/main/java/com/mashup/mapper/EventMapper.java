@@ -2,11 +2,13 @@ package com.mashup.mapper;
 
 import com.mashup.dto.external.TicketmasterResponse;
 import com.mashup.dto.generated.EventResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Component
 public class EventMapper {
 
@@ -21,7 +23,7 @@ public class EventMapper {
         response.setCity(city != null ? city : "Unknown");
         response.setFallback(false);
 
-        // Venue
+
         String venue = "Unknown Venue";
         if (event.getEmbedded() != null &&
                 event.getEmbedded().getVenues() != null &&
@@ -31,7 +33,7 @@ public class EventMapper {
         }
         response.setVenue(venue);
 
-        // Category
+
         String category = "General";
         if (event.getClassifications() != null &&
                 !event.getClassifications().isEmpty() &&
@@ -41,14 +43,20 @@ public class EventMapper {
         }
         response.setCategory(category);
 
+        log.debug("Mapped event: {} at {} - Category: {}", event.getName(), venue, category);
+
         return response;
     }
 
     public List<EventResponse> toEventResponseList(TicketmasterResponse response, String city) {
         if (response == null || response.getEmbedded() == null ||
                 response.getEmbedded().getEvents() == null) {
+            log.warn("No events found in Ticketmaster response for city: {}", city);
             return Collections.emptyList();
         }
+
+        int totalEvents = response.getEmbedded().getEvents().size();
+        log.info("Processing {} events from Ticketmaster for {}", totalEvents, city);
 
         List<EventResponse> events = new ArrayList<>();
         for (TicketmasterResponse.Event event : response.getEmbedded().getEvents()) {
@@ -57,13 +65,16 @@ public class EventMapper {
                 events.add(eventResponse);
             }
         }
+
+        log.info("Successfully mapped {} events for {}", events.size(), city);
         return events;
     }
 
     public List<EventResponse> toFallbackResponse(String city) {
+        log.warn("Using fallback events for city: {}", city);
         EventResponse fallback = new EventResponse();
         fallback.setId("fallback-1");
-        fallback.setName("Local Event (Fallback)");
+        fallback.setName("Local Event (Fallback Mode)");
         fallback.setVenue("City Center");
         fallback.setCity(city != null ? city : "Unknown");
         fallback.setCategory("General");

@@ -31,24 +31,28 @@ public class EventService {
     @Cacheable(value = "events", key = "#city + '_' + #date")
     @CircuitBreaker(name = "eventsApi", fallbackMethod = "getEventsFallback")
     public CompletableFuture<List<EventResponse>> getEvents(String city, String date) {
-        log.info("🎭 Fetching events for: {} on {}", city, date);
+        log.info(" Fetching events for: {} on {}", city, date);
 
         if (city == null || city.trim().isEmpty()) {
             throw new IllegalArgumentException("City parameter cannot be null or empty");
         }
 
+        // Vérification de la date
+        if (date == null || date.trim().isEmpty()) {
+            throw new IllegalArgumentException("Date parameter cannot be null or empty");
+        }
 
         if (mockEnabled) {
             log.info(" Using MOCK events service for: {}", city);
             return getMockEvents(city);
         }
 
-
-        if (apiKey == null || apiKey.isEmpty()) {
-            log.warn("No API key for Ticketmaster, using mock");
+        if (apiKey == null || apiKey.isEmpty() || "demo-key-please-change".equals(apiKey)) {
+            log.warn("No valid API key for Ticketmaster, using mock");
             return getMockEvents(city);
         }
 
+        log.info(" Calling Ticketmaster API for city: {}, date: {}", city, date);
 
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -57,11 +61,12 @@ public class EventService {
                         .path("/discovery/v2/events.json")
                         .queryParam("apikey", apiKey)
                         .queryParam("city", city)
-                        .queryParam("size", 5)
+                        .queryParam("pageSize", 10)
+                        .queryParam("sort", "date,asc")
                         .build())
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError(), response -> {
-                    log.error("Ticketmaster API error: {}", response.statusCode().value());
+                    log.error("Ticketmaster API client error: {}", response.statusCode().value());
                     throw new ExternalApiException("Ticketmaster", "/events", response.statusCode().value());
                 })
                 .onStatus(status -> status.is5xxServerError(), response -> {
@@ -69,7 +74,10 @@ public class EventService {
                     throw new ExternalApiException("Ticketmaster", "/events", response.statusCode().value());
                 })
                 .bodyToMono(TicketmasterResponse.class)
-                .map(response -> eventMapper.toEventResponseList(response, city))
+                .map(response -> {
+                    log.info(" Received response from Ticketmaster for {}", city);
+                    return eventMapper.toEventResponseList(response, city);
+                })
                 .doOnSuccess(r -> log.info("✅ Found {} events for {}", r.size(), city))
                 .doOnError(e -> log.error("❌ Error fetching events for {}: {}", city, e.getMessage()))
                 .toFuture();
@@ -112,7 +120,7 @@ public class EventService {
     }
 
     public CompletableFuture<List<EventResponse>> getEventsFallback(String city, String date, Throwable ex) {
-        log.warn("⚠️ Fallback for events in: {}", city);
+        log.warn(" Circuit Breaker OPEN - Using fallback for events in: {}", city);
         return CompletableFuture.completedFuture(eventMapper.toFallbackResponse(city));
     }
 }

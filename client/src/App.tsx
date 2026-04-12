@@ -65,7 +65,7 @@ interface BenchmarkResult {
 }
 
 function App() {
-  // ✅ Charger la dernière ville depuis localStorage
+
   const [city, setCity] = useState(() => {
     const saved = localStorage.getItem('lastCity');
     return saved || 'Paris';
@@ -75,13 +75,24 @@ function App() {
   const [data, setData] = useState<AgendaResponse | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [showBenchmark, setShowBenchmark] = useState(false);
+  const [eventPage, setEventPage] = useState(1);
+  const eventsPerPage = 6;
 
   const cities = ['Paris', 'London', 'New York', 'Tokyo', 'Douala', 'Dschang', 'Yaounde'];
 
-  // ✅ Sauvegarder la ville à chaque changement
+
+  useEffect(() => {
+    setEventPage(1);
+  }, [data]);
+
+
   useEffect(() => {
     localStorage.setItem('lastCity', city);
   }, [city]);
+
+
+  const paginatedEvents = data?.events?.slice(0, eventPage * eventsPerPage);
+  const hasMore = data?.events && data.events.length > (paginatedEvents?.length || 0);
 
   const handleSearch = async () => {
     if (!city.trim()) {
@@ -318,34 +329,47 @@ function App() {
 
               {/* Grid */}
               <div className="grid-2">
-                {/* Events */}
+                {/* Events avec pagination */}
                 <div className="events-card">
                   <div className="card-title">
                     <CalendarDays className="w-5 h-5 text-blue-400" />
                     Upcoming Events
                   </div>
-                  {data.events.length === 0 ? (
+                  {paginatedEvents && paginatedEvents.length === 0 ? (
                       <div className="empty-events">
                         <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                         <p>No events found</p>
                         <p className="text-xs mt-1">Try another date</p>
                       </div>
                   ) : (
-                      <div className="events-list">
-                        {data.events.map((event, idx) => (
-                            <div key={idx} className="event-item">
-                              <div className="event-icon" style={{ color: '#60a5fa' }}>
-                                {getCategoryIcon(event.category)}
+                      <>
+                        <div className="events-list">
+                          {paginatedEvents?.map((event, idx) => (
+                              <div key={idx} className="event-item">
+                                <div className="event-icon" style={{ color: '#60a5fa' }}>
+                                  {getCategoryIcon(event.category)}
+                                </div>
+                                <div className="event-info">
+                                  <div className="event-name">{event.name}</div>
+                                  <div className="event-venue">{event.venue}</div>
+                                  <span className="event-category">{event.category}</span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-600" />
                               </div>
-                              <div className="event-info">
-                                <div className="event-name">{event.name}</div>
-                                <div className="event-venue">{event.venue}</div>
-                                <span className="event-category">{event.category}</span>
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-gray-600" />
+                          ))}
+                        </div>
+                        {hasMore && (
+                            <div className="text-center mt-4 pt-2 border-t border-white/10">
+                              <button
+                                  onClick={() => setEventPage(p => p + 1)}
+                                  className="text-sm text-primary-400 hover:text-primary-300 transition-colors flex items-center justify-center gap-1 mx-auto"
+                              >
+                                Load more events ({data.events.length - (paginatedEvents?.length || 0)} remaining)
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
                             </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                   )}
                 </div>
 
