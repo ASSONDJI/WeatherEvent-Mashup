@@ -60,13 +60,12 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/mashup_db
-      - SPRING_DATASOURCE_USERNAME=mashup
-      - SPRING_DATASOURCE_PASSWORD=mashup123
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - mashup-network
