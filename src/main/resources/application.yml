@@ -15,8 +15,23 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
+
+  redis:
+    host: ${REDIS_HOST:redis}
+    port: ${REDIS_PORT:6379}
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
   cache:
-    type: simple
+    type: ${CACHE_TYPE:simple}
+    redis:
+      time-to-live: 600000
+      cache-null-values: false
+
   jackson:
     serialization:
       fail-on-empty-beans: false
@@ -74,6 +89,7 @@ logging:
   level:
     com.mashup: DEBUG
     io.github.resilience4j: INFO
+    org.springframework.cache: DEBUG
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
@@ -81,7 +97,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,circuitbreakers
+        include: health,info,metrics,circuitbreakers,caches
   endpoint:
     health:
       show-details: always

@@ -17,6 +17,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import lombok.Data;
 
 @Slf4j
 @RestController
@@ -200,5 +204,107 @@ public class AgendaControllerImpl {
         }
 
         return speedup;
+    }
+
+    @GetMapping("/agenda/benchmark/rigorous")
+    @Operation(
+            summary = "Benchmark rigoureux avec itérations",
+            description = """
+    Effectue N itérations des modes séquentiel et parallèle,
+    calcule la moyenne, l'écart-type et le percentile 95.
+    
+    Paramètres:
+    - city: nom de la ville
+    - date: date au format YYYY-MM-DD
+    - iterations: nombre d'itérations (défaut: 10)
+    - warmup: nombre d'itérations d'échauffement (défaut: 3)
+    """
+    )
+    public ResponseEntity<RigorousBenchmarkResult> rigorousBenchmark(
+            @RequestParam String city,
+            @RequestParam String date,
+            @RequestParam(defaultValue = "10") int iterations,
+            @RequestParam(defaultValue = "3") int warmup) {
+
+        log.info("📊 Starting rigorous benchmark for {} on {} (iterations: {}, warmup: {})",
+                city, date, iterations, warmup);
+
+        // Phase d'échauffement
+        for (int i = 0; i < warmup; i++) {
+            agendaService.buildAgendaSequential(city, date);
+            agendaService.buildAgendaParallel(city, date);
+        }
+
+        // Mesures séquentielles
+        List<Long> sequentialTimes = new ArrayList<>();
+        for (int i = 0; i < iterations; i++) {
+            long start = System.nanoTime();
+            agendaService.buildAgendaSequential(city, date);
+            long end = System.nanoTime();
+            sequentialTimes.add((end - start) / 1_000_000);
+        }
+
+        // Mesures parallèles
+        List<Long> parallelTimes = new ArrayList<>();
+        for (int i = 0; i < iterations; i++) {
+            long start = System.nanoTime();
+            agendaService.buildAgendaParallel(city, date);
+            long end = System.nanoTime();
+            parallelTimes.add((end - start) / 1_000_000);
+        }
+
+        RigorousBenchmarkResult result = new RigorousBenchmarkResult();
+        result.setCity(city);
+        result.setDate(date);
+        result.setIterations(iterations);
+        result.setWarmup(warmup);
+        result.setSequentialStats(calculateStats(sequentialTimes));
+        result.setParallelStats(calculateStats(parallelTimes));
+        result.setSpeedupMean(result.getSequentialStats().getMean() / result.getParallelStats().getMean());
+
+        return ResponseEntity.ok(result);
+    }
+
+    private Statistics calculateStats(List<Long> times) {
+        Statistics stats = new Statistics();
+        double mean = times.stream().mapToLong(Long::longValue).average().orElse(0);
+        stats.setMean(mean);
+
+        double variance = times.stream()
+                .mapToDouble(t -> Math.pow(t - mean, 2))
+                .average()
+                .orElse(0);
+        stats.setStdDev(Math.sqrt(variance));
+
+        List<Long> sorted = new ArrayList<>(times);
+        Collections.sort(sorted);
+        int p95Index = (int) Math.ceil(0.95 * sorted.size()) - 1;
+        stats.setPercentile95(sorted.get(Math.max(0, p95Index)));
+        stats.setMin(Collections.min(times));
+        stats.setMax(Collections.max(times));
+        stats.setCount(times.size());
+
+        return stats;
+    }
+
+    @Data
+    public static class RigorousBenchmarkResult {
+        private String city;
+        private String date;
+        private int iterations;
+        private int warmup;
+        private Statistics sequentialStats;
+        private Statistics parallelStats;
+        private double speedupMean;
+    }
+
+    @Data
+    public static class Statistics {
+        private double mean;
+        private double stdDev;
+        private long percentile95;
+        private long min;
+        private long max;
+        private int count;
     }
 }
