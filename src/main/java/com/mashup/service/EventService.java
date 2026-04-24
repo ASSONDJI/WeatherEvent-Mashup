@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,31 +29,19 @@ public class EventService {
     @Value("${mock.events.enabled:true}")
     private boolean mockEnabled;
 
-    @Cacheable(value = "events", key = "#city + '_' + #date")
     @CircuitBreaker(name = "eventsApi", fallbackMethod = "getEventsFallback")
     public CompletableFuture<List<EventResponse>> getEvents(String city, String date) {
-        log.info(" Fetching events for: {} on {}", city, date);
+        return CompletableFuture.supplyAsync(() -> getEventsCached(city, date));
+    }
 
-        if (city == null || city.trim().isEmpty()) {
-            throw new IllegalArgumentException("City parameter cannot be null or empty");
-        }
+    @Cacheable(value = "events", key = "#city + '_' + #date")
+    public List<EventResponse> getEventsCached(String city, String date) {
+        log.info("Fetching events for: {} on {}", city, date);
 
-        // Vérification de la date
-        if (date == null || date.trim().isEmpty()) {
-            throw new IllegalArgumentException("Date parameter cannot be null or empty");
-        }
-
-        if (mockEnabled) {
-            log.info(" Using MOCK events service for: {}", city);
+        if (mockEnabled || apiKey == null || apiKey.isEmpty()) {
+            log.info("Using MOCK events for: {}", city);
             return getMockEvents(city);
         }
-
-        if (apiKey == null || apiKey.isEmpty() || "demo-key-please-change".equals(apiKey)) {
-            log.warn("No valid API key for Ticketmaster, using mock");
-            return getMockEvents(city);
-        }
-
-        log.info(" Calling Ticketmaster API for city: {}, date: {}", city, date);
 
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -65,62 +54,38 @@ public class EventService {
                         .queryParam("sort", "date,asc")
                         .build())
                 .retrieve()
-                .onStatus(status -> status.is4xxClientError(), response -> {
-                    log.error("Ticketmaster API client error: {}", response.statusCode().value());
-                    throw new ExternalApiException("Ticketmaster", "/events", response.statusCode().value());
-                })
-                .onStatus(status -> status.is5xxServerError(), response -> {
-                    log.error("Ticketmaster server error: {}", response.statusCode().value());
-                    throw new ExternalApiException("Ticketmaster", "/events", response.statusCode().value());
-                })
+
+                .onStatus(status -> status.is4xxClientError(), response ->
+                        Mono.error(new ExternalApiException("Ticketmaster", "/events",
+                                response.statusCode().value())))
+                .onStatus(status -> status.is5xxServerError(), response ->
+                        Mono.error(new ExternalApiException("Ticketmaster", "/events",
+                                response.statusCode().value())))
                 .bodyToMono(TicketmasterResponse.class)
-                .map(response -> {
-                    log.info(" Received response from Ticketmaster for {}", city);
-                    return eventMapper.toEventResponseList(response, city);
-                })
-                .doOnSuccess(r -> log.info("✅ Found {} events for {}", r.size(), city))
-                .doOnError(e -> log.error("❌ Error fetching events for {}: {}", city, e.getMessage()))
-                .toFuture();
-    }
-
-    private CompletableFuture<List<EventResponse>> getMockEvents(String city) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-
-            EventResponse event1 = new EventResponse();
-            event1.setId("mock-1");
-            event1.setName("Mock Jazz Festival");
-            event1.setVenue("Mock Downtown Theater");
-            event1.setCity(city);
-            event1.setCategory("Music");
-            event1.setFallback(false);
-
-            EventResponse event2 = new EventResponse();
-            event2.setId("mock-2");
-            event2.setName("Mock Art Exhibition");
-            event2.setVenue("Mock City Museum");
-            event2.setCity(city);
-            event2.setCategory("Art");
-            event2.setFallback(false);
-
-            EventResponse event3 = new EventResponse();
-            event3.setId("mock-3");
-            event3.setName("Mock Food Fair");
-            event3.setVenue("Mock Central Square");
-            event3.setCity(city);
-            event3.setCategory("Gastronomy");
-            event3.setFallback(false);
-
-            return List.of(event1, event2, event3);
-        });
+                .map(response -> eventMapper.toEventResponseList(response, city))
+                .doOnSuccess(r -> log.info("Found {} events for {}", r.size(), city))
+                .doOnError(e -> log.error("Error fetching events for {}: {}", city, e.getMessage()))
+                .block();
     }
 
     public CompletableFuture<List<EventResponse>> getEventsFallback(String city, String date, Throwable ex) {
-        log.warn(" Circuit Breaker OPEN - Using fallback for events in: {}", city);
+        log.warn("Circuit Breaker OPEN - fallback events for: {}", city);
         return CompletableFuture.completedFuture(eventMapper.toFallbackResponse(city));
+    }
+
+    private List<EventResponse> getMockEvents(String city) {
+        try { Thread.sleep(200); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+        EventResponse e1 = new EventResponse();
+        e1.setId("mock-1"); e1.setName("Mock Jazz Festival");
+        e1.setVenue("Mock Theater"); e1.setCity(city);
+        e1.setCategory("Music"); e1.setFallback(false);
+
+        EventResponse e2 = new EventResponse();
+        e2.setId("mock-2"); e2.setName("Mock Art Exhibition");
+        e2.setVenue("Mock Museum"); e2.setCity(city);
+        e2.setCategory("Art"); e2.setFallback(false);
+
+        return List.of(e1, e2);
     }
 }

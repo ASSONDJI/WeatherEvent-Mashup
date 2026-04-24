@@ -9,10 +9,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -31,60 +29,60 @@ class WeatherServiceTest {
         ReflectionTestUtils.setField(weatherService, "mockEnabled", false);
     }
 
+    
     @Test
-    void shouldThrowExceptionWhenCityIsNull() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            weatherService.getWeather(null);
-        });
+    void getWeatherCached_WhenCityIsNull_ShouldThrowException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> weatherService.getWeatherCached(null));
     }
 
     @Test
-    void shouldThrowExceptionWhenCityIsEmpty() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            weatherService.getWeather("");
-        });
+    void getWeatherCached_WhenCityIsEmpty_ShouldThrowException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> weatherService.getWeatherCached(""));
     }
 
     @Test
-    void shouldReturnMockDataWhenMockEnabled() throws ExecutionException, InterruptedException {
+    void getWeather_WhenMockEnabled_ShouldReturnMockData()
+            throws ExecutionException, InterruptedException {
         ReflectionTestUtils.setField(weatherService, "mockEnabled", true);
-        String city = "Paris";
 
-        CompletableFuture<WeatherResponse> future = weatherService.getWeather(city);
+        CompletableFuture<WeatherResponse> future = weatherService.getWeather("Paris");
         WeatherResponse response = future.get();
 
         assertNotNull(response);
-        assertEquals(city, response.getCity());
+        assertEquals("Paris", response.getCity());
+        assertFalse(response.getFallback());
+        assertEquals("Sunny", response.getCondition());
+    }
+
+    @Test
+    void getWeather_WhenApiKeyMissing_ShouldReturnMockData()
+            throws ExecutionException, InterruptedException {
+        ReflectionTestUtils.setField(weatherService, "apiKey", "");
+
+        CompletableFuture<WeatherResponse> future = weatherService.getWeather("Paris");
+        WeatherResponse response = future.get();
+
+        assertNotNull(response);
+        assertEquals("Paris", response.getCity());
         assertFalse(response.getFallback());
     }
 
     @Test
-    void shouldReturnMockDataWhenApiKeyMissing() throws ExecutionException, InterruptedException {
-        ReflectionTestUtils.setField(weatherService, "apiKey", "");
-        String city = "Paris";
-
-        CompletableFuture<WeatherResponse> future = weatherService.getWeather(city);
-        WeatherResponse response = future.get();
-
-        assertNotNull(response);
-        assertEquals(city, response.getCity());
-    }
-
-    @Test
-    void shouldReturnFallbackResponse() {
-        String city = "Paris";
-        Throwable ex = new RuntimeException("API Error");
-
+    void getWeatherFallback_ShouldReturnFallbackResponse() {
         WeatherResponse fallback = new WeatherResponse();
-        fallback.setCity(city);
+        fallback.setCity("Paris");
         fallback.setFallback(true);
-        when(weatherMapper.toFallbackResponse(city)).thenReturn(fallback);
+        when(weatherMapper.toFallbackResponse("Paris")).thenReturn(fallback);
 
-        CompletableFuture<WeatherResponse> future = weatherService.getWeatherFallback(city, ex);
+        CompletableFuture<WeatherResponse> future =
+                weatherService.getWeatherFallback("Paris", new RuntimeException("API Error"));
         WeatherResponse response = future.join();
 
         assertNotNull(response);
         assertTrue(response.getFallback());
-        assertEquals(city, response.getCity());
+        assertEquals("Paris", response.getCity());
+        verify(weatherMapper).toFallbackResponse("Paris");
     }
 }

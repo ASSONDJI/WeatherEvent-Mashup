@@ -187,6 +187,52 @@ paths:
 
 components:
   schemas:
+    BenchmarkStats:
+      type: object
+      properties:
+        mean:
+          type: number
+          format: double
+          description: Moyenne en millisecondes
+        stdDev:
+          type: number
+          format: double
+          description: Écart-type
+        percentile95:
+          type: integer
+          format: int64
+          description: Percentile 95
+        min:
+          type: integer
+          format: int64
+          description: Temps minimum
+        max:
+          type: integer
+          format: int64
+          description: Temps maximum
+        count:
+          type: integer
+          description: Nombre d'itérations
+
+    RigorousBenchmarkResult:
+        type: object
+        properties:
+          city:
+            type: string
+          date:
+            type: string
+          iterations:
+            type: integer
+          warmup:
+            type: integer
+          sequentialStats:
+            $ref: '#/components/schemas/BenchmarkStats'
+          parallelStats:
+            $ref: '#/components/schemas/BenchmarkStats'
+          speedupMean:
+            type: number
+            format: double
+            description: Facteur d'accélération moyen
     ModeEnum:
       type: string
       enum:

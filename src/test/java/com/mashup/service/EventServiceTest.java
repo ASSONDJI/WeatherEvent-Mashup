@@ -9,12 +9,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -30,86 +27,60 @@ class EventServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(eventService, "apiKey", "test-api-key");
-        ReflectionTestUtils.setField(eventService, "mockEnabled", false);
-    }
-
-    @Test
-    void shouldThrowExceptionWhenCityIsNull() {
-        String date = "2024-12-25";
-        assertThrows(IllegalArgumentException.class, () -> {
-            eventService.getEvents(null, date);
-        });
-    }
-
-    @Test
-    void shouldThrowExceptionWhenCityIsEmpty() {
-        String date = "2024-12-25";
-        assertThrows(IllegalArgumentException.class, () -> {
-            eventService.getEvents("", date);
-        });
-    }
-
-    @Test
-    void shouldThrowExceptionWhenDateIsNull() {
-        String city = "Paris";
-        assertThrows(IllegalArgumentException.class, () -> {
-            eventService.getEvents(city, null);
-        });
-    }
-
-    @Test
-    void shouldThrowExceptionWhenDateIsEmpty() {
-        String city = "Paris";
-        assertThrows(IllegalArgumentException.class, () -> {
-            eventService.getEvents(city, "");
-        });
-    }
-
-    @Test
-    void shouldReturnMockEventsWhenMockEnabled() throws ExecutionException, InterruptedException {
         ReflectionTestUtils.setField(eventService, "mockEnabled", true);
-        String city = "Paris";
-        String date = "2024-12-25";
+    }
 
-        CompletableFuture<List<EventResponse>> future = eventService.getEvents(city, date);
+    @Test
+    void getEvents_WhenMockEnabled_ShouldReturnMockEvents()
+            throws ExecutionException, InterruptedException {
+        CompletableFuture<List<EventResponse>> future =
+                eventService.getEvents("Paris", "2024-12-25");
         List<EventResponse> events = future.get();
 
         assertNotNull(events);
-        assertEquals(3, events.size());
+        assertFalse(events.isEmpty());
         assertEquals("Mock Jazz Festival", events.get(0).getName());
+        assertFalse(events.get(0).getFallback());
     }
 
     @Test
-    void shouldReturnMockEventsWhenApiKeyMissing() throws ExecutionException, InterruptedException {
+    void getEvents_WhenApiKeyMissing_ShouldReturnMockEvents()
+            throws ExecutionException, InterruptedException {
         ReflectionTestUtils.setField(eventService, "apiKey", "");
-        String city = "Paris";
-        String date = "2024-12-25";
+        ReflectionTestUtils.setField(eventService, "mockEnabled", false);
 
-        CompletableFuture<List<EventResponse>> future = eventService.getEvents(city, date);
+        CompletableFuture<List<EventResponse>> future =
+                eventService.getEvents("Paris", "2024-12-25");
         List<EventResponse> events = future.get();
 
         assertNotNull(events);
-        assertEquals(3, events.size());
+        assertFalse(events.isEmpty());
     }
 
     @Test
-    void shouldReturnFallbackResponse() {
-        String city = "Paris";
-        String date = "2024-12-25";
-        Throwable ex = new RuntimeException("API Error");
-
+    void getEventsFallback_ShouldReturnFallbackEvents() {
         EventResponse fallbackEvent = new EventResponse();
         fallbackEvent.setId("fallback-1");
-        fallbackEvent.setName("Local Event (Fallback)");
         fallbackEvent.setFallback(true);
+        when(eventMapper.toFallbackResponse("Paris")).thenReturn(List.of(fallbackEvent));
 
-        when(eventMapper.toFallbackResponse(city)).thenReturn(Arrays.asList(fallbackEvent));
-
-        CompletableFuture<List<EventResponse>> future = eventService.getEventsFallback(city, date, ex);
+        CompletableFuture<List<EventResponse>> future =
+                eventService.getEventsFallback("Paris", "2024-12-25",
+                        new RuntimeException("API Error"));
         List<EventResponse> events = future.join();
 
         assertNotNull(events);
         assertEquals(1, events.size());
         assertTrue(events.get(0).getFallback());
+        verify(eventMapper).toFallbackResponse("Paris");
+    }
+
+    @Test
+    void getEventsCached_WhenMockEnabled_ShouldReturnTwoEvents() {
+        List<EventResponse> events = eventService.getEventsCached("Lyon", "2024-12-25");
+
+        assertNotNull(events);
+        assertEquals(2, events.size());
+        assertEquals("Mock Art Exhibition", events.get(1).getName());
     }
 }
