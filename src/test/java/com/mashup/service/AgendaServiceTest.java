@@ -1,14 +1,18 @@
 package com.mashup.service;
 
+import com.mashup.dto.generated.AgendaResponse;
+import com.mashup.dto.generated.EventResponse;
+import com.mashup.dto.generated.RecommendationResponse;
 import com.mashup.dto.generated.WeatherResponse;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AgendaServiceTest {
@@ -27,33 +31,83 @@ class AgendaServiceTest {
 
     @Test
     void calculateSpeedup_WithNormalValues_ShouldReturnCorrectSpeedup() {
-        long sequentialTime = 600;
-        long parallelTime = 200;
-        double speedup = agendaService.calculateSpeedup(sequentialTime, parallelTime);
-        assertEquals(3.0, speedup);
+        assertEquals(3.0, agendaService.calculateSpeedup(600, 200));
     }
 
     @Test
     void calculateSpeedup_WithZeroParallelTime_ShouldReturnSequentialTime() {
-        long sequentialTime = 500;
-        long parallelTime = 0;
-        double speedup = agendaService.calculateSpeedup(sequentialTime, parallelTime);
-        assertEquals(500.0, speedup);
+        assertEquals(500.0, agendaService.calculateSpeedup(500, 0));
     }
 
     @Test
     void calculateSpeedup_WithBothTimesZero_ShouldReturnOne() {
-        long sequentialTime = 0;
-        long parallelTime = 0;
-        double speedup = agendaService.calculateSpeedup(sequentialTime, parallelTime);
-        assertEquals(1.0, speedup);
+        assertEquals(1.0, agendaService.calculateSpeedup(0, 0));
     }
 
     @Test
     void calculateSpeedup_WithNegativeTimes_ShouldReturnZero() {
-        long sequentialTime = -100;
-        long parallelTime = 200;
-        double speedup = agendaService.calculateSpeedup(sequentialTime, parallelTime);
-        assertEquals(0.0, speedup);
+        assertEquals(0.0, agendaService.calculateSpeedup(-100, 200));
+    }
+
+    @Test
+    void buildAgendaParallel_ShouldReturnParallelMode() {
+
+        WeatherResponse weather = new WeatherResponse();
+        weather.setCity("Paris");
+        weather.setCondition("Clear");
+        weather.setFallback(false);
+
+        List<EventResponse> events = List.of(new EventResponse());
+        List<RecommendationResponse> recommendations = List.of(new RecommendationResponse());
+
+        when(weatherService.getWeather("Paris"))
+                .thenReturn(CompletableFuture.completedFuture(weather));
+        when(eventService.getEvents("Paris", "2024-12-25"))
+                .thenReturn(CompletableFuture.completedFuture(events));
+
+        when(recommendationService.getRecommendationsCached("Paris", weather))
+                .thenReturn(recommendations);
+
+
+        AgendaResponse response = agendaService.buildAgendaParallel("Paris", "2024-12-25");
+
+        assertNotNull(response);
+        assertEquals("Paris", response.getCity());
+        assertEquals("PARALLEL", response.getMode().getValue());
+        assertNotNull(response.getWeather());
+        verify(weatherService).getWeather("Paris");
+        verify(eventService).getEvents("Paris", "2024-12-25");
+        verify(recommendationService).getRecommendationsCached("Paris", weather);
+    }
+
+    @Test
+    void buildAgendaSequential_ShouldReturnSequentialMode() {
+
+        WeatherResponse weather = new WeatherResponse();
+        weather.setCity("Paris");
+        weather.setCondition("Clear");
+        weather.setFallback(false);
+
+        List<EventResponse> events = List.of(new EventResponse());
+        List<RecommendationResponse> recommendations = List.of(new RecommendationResponse());
+
+        when(weatherService.getWeather("Paris"))
+                .thenReturn(CompletableFuture.completedFuture(weather));
+        when(eventService.getEvents("Paris", "2024-12-25"))
+                .thenReturn(CompletableFuture.completedFuture(events));
+
+        when(recommendationService.getRecommendationsCached("Paris", weather))
+                .thenReturn(recommendations);
+
+
+        AgendaResponse response = agendaService.buildAgendaSequential("Paris", "2024-12-25");
+
+
+        assertNotNull(response);
+        assertEquals("Paris", response.getCity());
+        assertEquals("SEQUENTIAL", response.getMode().getValue());
+        verify(weatherService).getWeather("Paris");
+        verify(eventService).getEvents("Paris", "2024-12-25");
+        verify(recommendationService).getRecommendationsCached("Paris", weather);
     }
 }

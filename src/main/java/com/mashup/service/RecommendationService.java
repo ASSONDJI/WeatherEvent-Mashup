@@ -8,18 +8,10 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
 public class RecommendationService {
-
-
-    public CompletableFuture<List<RecommendationResponse>> getRecommendations(
-            String city, WeatherResponse weather) {
-        return CompletableFuture.supplyAsync(() -> getRecommendationsCached(city, weather));
-    }
-
 
     @Cacheable(value = "recommendations", key = "#city + '_' + #weather?.condition")
     public List<RecommendationResponse> getRecommendationsCached(
@@ -35,25 +27,20 @@ public class RecommendationService {
     }
 
 
-    public CompletableFuture<List<RecommendationResponse>> getRecommendationsFallback(
-            String city, Throwable ex) {
+    public List<RecommendationResponse> getRecommendationsFallback(String city) {
         log.warn("Recommendation service fallback for: {}", city);
-        return CompletableFuture.supplyAsync(() -> {
-            List<RecommendationResponse> recommendations = new ArrayList<>();
-            addRecommendation(recommendations, city,
-                    "Explore Local Attractions", city + " City Center",
-                    "Popular spots recommended", 1, false);
-            addRecommendation(recommendations, city,
-                    "Local Cuisine Experience", city + " Food Market",
-                    "Authentic regional dishes", 2, true);
-            addRecommendation(recommendations, city,
-                    "Art Museum Tour", city + " Art Museum",
-                    "Impressive collection of local artists", 3, true);
-            return recommendations;
-        });
+        List<RecommendationResponse> recommendations = new ArrayList<>();
+        addRecommendation(recommendations, city,
+                "Explore Local Attractions", city + " City Center",
+                "Popular spots recommended", 1, false);
+        addRecommendation(recommendations, city,
+                "Local Cuisine Experience", city + " Food Market",
+                "Authentic regional dishes", 2, true);
+        addRecommendation(recommendations, city,
+                "Art Museum Tour", city + " Art Museum",
+                "Impressive collection of local artists", 3, true);
+        return recommendations;
     }
-
-
 
     private List<RecommendationResponse> generateRecommendationsByWeather(
             String city, WeatherResponse weather) {
