@@ -16,26 +16,24 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor // ✅ Remplace @Autowired manuel
+@RequiredArgsConstructor
 public class AgendaService {
 
     private final WeatherService weatherService;
     private final EventService eventService;
     private final RecommendationService recommendationService;
 
-    /**
-     * Builds agenda in PARALLEL mode.
-     * Weather and Events are fetched in parallel.
-     * Recommendations depend on weather so they start after weather is retrieved,
-     * but run in parallel with events.
-     */
     public AgendaResponse buildAgendaParallel(String city, String date) {
         long startTime = System.currentTimeMillis();
         log.info("[PARALLEL] Starting agenda for {} on {}", city, date);
 
         try {
-            CompletableFuture<WeatherResponse> weatherFuture = weatherService.getWeather(city);
-            CompletableFuture<List<EventResponse>> eventsFuture = eventService.getEvents(city, date);
+            // ✅ Appel direct à getWeatherCached() et getEventsCached()
+            // pour que @Cacheable soit intercepté par le proxy Spring
+            CompletableFuture<WeatherResponse> weatherFuture =
+                    CompletableFuture.supplyAsync(() -> weatherService.getWeatherCached(city));
+            CompletableFuture<List<EventResponse>> eventsFuture =
+                    CompletableFuture.supplyAsync(() -> eventService.getEventsCached(city, date));
 
             WeatherResponse weather = weatherFuture.join();
 
@@ -77,19 +75,14 @@ public class AgendaService {
         }
     }
 
-    /**
-     * Builds agenda in SEQUENTIAL mode (for benchmark comparison).
-     * Each service is called one after the other.
-     * Total time = sum of all latencies.
-     */
     public AgendaResponse buildAgendaSequential(String city, String date) {
         long startTime = System.currentTimeMillis();
         log.info("[SEQUENTIAL] Starting agenda for {} on {}", city, date);
 
         try {
-            WeatherResponse weather = weatherService.getWeather(city).join();
-            List<EventResponse> events = eventService.getEvents(city, date).join();
-
+            // ✅ Appel direct à getWeatherCached() et getEventsCached()
+            WeatherResponse weather = weatherService.getWeatherCached(city);
+            List<EventResponse> events = eventService.getEventsCached(city, date);
             List<RecommendationResponse> recommendations =
                     recommendationService.getRecommendationsCached(city, weather);
 
@@ -125,13 +118,6 @@ public class AgendaService {
         }
     }
 
-    /**
-     * Calcule le facteur d'accélération de manière sécurisée.
-     * parallelTime == 0 && sequentialTime == 0 → 1.0
-     * parallelTime == 0 && sequentialTime > 0  → sequentialTime
-     * parallelTime > 0 && sequentialTime == 0  → 0.0
-     * temps négatifs → 0.0
-     */
     public double calculateSpeedup(long sequentialTime, long parallelTime) {
         if (sequentialTime < 0 || parallelTime < 0) {
             log.warn("Temps négatifs détectés - seq: {}ms, par: {}ms", sequentialTime, parallelTime);
