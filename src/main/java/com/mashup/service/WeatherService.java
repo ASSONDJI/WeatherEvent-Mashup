@@ -37,6 +37,7 @@ public class WeatherService {
     }
 
 
+    @CircuitBreaker(name = "weatherApi", fallbackMethod = "getWeatherCachedFallback")
     @Cacheable(value = "weather", key = "#city")
     public WeatherResponse getWeatherCached(String city) {
         log.info("Fetching weather for: {}", city);
@@ -75,6 +76,12 @@ public class WeatherService {
     public CompletableFuture<WeatherResponse> getWeatherFallback(String city, Throwable ex) {
         log.warn("Circuit Breaker OPEN - fallback weather for: {}", city);
         return CompletableFuture.completedFuture(weatherMapper.toFallbackResponse(city));
+    }
+
+
+    public WeatherResponse getWeatherCachedFallback(String city, Throwable ex) {
+        log.warn("Circuit Breaker OPEN - fallback weather cached for: {}", city);
+        return weatherMapper.toFallbackResponse(city);
     }
 
     private WeatherResponse getMockWeather(String city) {

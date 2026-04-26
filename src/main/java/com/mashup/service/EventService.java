@@ -29,11 +29,14 @@ public class EventService {
     @Value("${mock.events.enabled:true}")
     private boolean mockEnabled;
 
+
     @CircuitBreaker(name = "eventsApi", fallbackMethod = "getEventsFallback")
     public CompletableFuture<List<EventResponse>> getEvents(String city, String date) {
         return CompletableFuture.supplyAsync(() -> getEventsCached(city, date));
     }
 
+
+    @CircuitBreaker(name = "eventsApi", fallbackMethod = "getEventsCachedFallback")
     @Cacheable(value = "events", key = "#city + '_' + #date")
     public List<EventResponse> getEventsCached(String city, String date) {
         log.info("Fetching events for: {} on {}", city, date);
@@ -54,7 +57,6 @@ public class EventService {
                         .queryParam("sort", "date,asc")
                         .build())
                 .retrieve()
-
                 .onStatus(status -> status.is4xxClientError(), response ->
                         Mono.error(new ExternalApiException("Ticketmaster", "/events",
                                 response.statusCode().value())))
@@ -68,9 +70,18 @@ public class EventService {
                 .block();
     }
 
-    public CompletableFuture<List<EventResponse>> getEventsFallback(String city, String date, Throwable ex) {
+
+    public CompletableFuture<List<EventResponse>> getEventsFallback(
+            String city, String date, Throwable ex) {
         log.warn("Circuit Breaker OPEN - fallback events for: {}", city);
         return CompletableFuture.completedFuture(eventMapper.toFallbackResponse(city));
+    }
+
+
+    public List<EventResponse> getEventsCachedFallback(
+            String city, String date, Throwable ex) {
+        log.warn("Circuit Breaker OPEN - fallback events cached for: {}", city);
+        return eventMapper.toFallbackResponse(city);
     }
 
     private List<EventResponse> getMockEvents(String city) {

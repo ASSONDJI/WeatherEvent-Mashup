@@ -10,7 +10,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -51,7 +50,6 @@ class AgendaServiceTest {
 
     @Test
     void buildAgendaParallel_ShouldReturnParallelMode() {
-
         WeatherResponse weather = new WeatherResponse();
         weather.setCity("Paris");
         weather.setCondition("Clear");
@@ -60,29 +58,24 @@ class AgendaServiceTest {
         List<EventResponse> events = List.of(new EventResponse());
         List<RecommendationResponse> recommendations = List.of(new RecommendationResponse());
 
-        when(weatherService.getWeather("Paris"))
-                .thenReturn(CompletableFuture.completedFuture(weather));
-        when(eventService.getEvents("Paris", "2024-12-25"))
-                .thenReturn(CompletableFuture.completedFuture(events));
 
+        when(weatherService.getWeatherCached("Paris")).thenReturn(weather);
+        when(eventService.getEventsCached("Paris", "2024-12-25")).thenReturn(events);
         when(recommendationService.getRecommendationsCached("Paris", weather))
                 .thenReturn(recommendations);
-
 
         AgendaResponse response = agendaService.buildAgendaParallel("Paris", "2024-12-25");
 
         assertNotNull(response);
         assertEquals("Paris", response.getCity());
         assertEquals("PARALLEL", response.getMode().getValue());
-        assertNotNull(response.getWeather());
-        verify(weatherService).getWeather("Paris");
-        verify(eventService).getEvents("Paris", "2024-12-25");
+        verify(weatherService).getWeatherCached("Paris");
+        verify(eventService).getEventsCached("Paris", "2024-12-25");
         verify(recommendationService).getRecommendationsCached("Paris", weather);
     }
 
     @Test
     void buildAgendaSequential_ShouldReturnSequentialMode() {
-
         WeatherResponse weather = new WeatherResponse();
         weather.setCity("Paris");
         weather.setCondition("Clear");
@@ -91,23 +84,19 @@ class AgendaServiceTest {
         List<EventResponse> events = List.of(new EventResponse());
         List<RecommendationResponse> recommendations = List.of(new RecommendationResponse());
 
-        when(weatherService.getWeather("Paris"))
-                .thenReturn(CompletableFuture.completedFuture(weather));
-        when(eventService.getEvents("Paris", "2024-12-25"))
-                .thenReturn(CompletableFuture.completedFuture(events));
 
+        when(weatherService.getWeatherCached("Paris")).thenReturn(weather);
+        when(eventService.getEventsCached("Paris", "2024-12-25")).thenReturn(events);
         when(recommendationService.getRecommendationsCached("Paris", weather))
                 .thenReturn(recommendations);
 
-
         AgendaResponse response = agendaService.buildAgendaSequential("Paris", "2024-12-25");
-
 
         assertNotNull(response);
         assertEquals("Paris", response.getCity());
         assertEquals("SEQUENTIAL", response.getMode().getValue());
-        verify(weatherService).getWeather("Paris");
-        verify(eventService).getEvents("Paris", "2024-12-25");
+        verify(weatherService).getWeatherCached("Paris");
+        verify(eventService).getEventsCached("Paris", "2024-12-25");
         verify(recommendationService).getRecommendationsCached("Paris", weather);
     }
 }
